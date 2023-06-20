@@ -1,23 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * SHARP - vty code
  * Copyright (C) Cumulus Networks, Inc.
  *               Donald Sharp
- *
- * This file is part of FRR.
- *
- * FRR is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * FRR is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include <zebra.h>
 
@@ -32,14 +17,13 @@
 #include "linklist.h"
 #include "link_state.h"
 #include "cspf.h"
+#include "tc.h"
 
 #include "sharpd/sharp_globals.h"
 #include "sharpd/sharp_zebra.h"
 #include "sharpd/sharp_nht.h"
 #include "sharpd/sharp_vty.h"
-#ifndef VTYSH_EXTRACT_PL
 #include "sharpd/sharp_vty_clippy.c"
-#endif
 
 DEFINE_MTYPE_STATIC(SHARPD, SRV6_LOCATOR, "SRv6 Locator");
 
@@ -432,7 +416,8 @@ DEFPY (install_seg6local_routes,
 	      End_T$seg6l_endt (1-4294967295)$seg6l_endt_table|\
 	      End_DX4$seg6l_enddx4 A.B.C.D$seg6l_enddx4_nh4|\
 	      End_DT6$seg6l_enddt6 (1-4294967295)$seg6l_enddt6_table|\
-	      End_DT4$seg6l_enddt4 (1-4294967295)$seg6l_enddt4_table>\
+	      End_DT4$seg6l_enddt4 (1-4294967295)$seg6l_enddt4_table|\
+	      End_DT46$seg6l_enddt46 (1-4294967295)$seg6l_enddt46_table>\
 	  (1-1000000)$routes [repeat (2-1000)$rpt]",
        "Sharp routing Protocol\n"
        "install some routes\n"
@@ -452,6 +437,8 @@ DEFPY (install_seg6local_routes,
        "SRv6 End.DT6 function to use\n"
        "Redirect table id to use\n"
        "SRv6 End.DT4 function to use\n"
+       "Redirect table id to use\n"
+       "SRv6 End.DT46 function to use\n"
        "Redirect table id to use\n"
        "How many to create\n"
        "Should we repeat this command\n"
@@ -508,6 +495,9 @@ DEFPY (install_seg6local_routes,
 	} else if (seg6l_enddt4) {
 		action = ZEBRA_SEG6_LOCAL_ACTION_END_DT4;
 		ctx.table = seg6l_enddt4_table;
+	} else if (seg6l_enddt46) {
+		action = ZEBRA_SEG6_LOCAL_ACTION_END_DT46;
+		ctx.table = seg6l_enddt46_table;
 	} else {
 		action = ZEBRA_SEG6_LOCAL_ACTION_END;
 	}
@@ -995,6 +985,7 @@ DEFUN (show_sharp_ted,
 	struct ls_edge *edge;
 	struct ls_subnet *subnet;
 	uint64_t key;
+	struct ls_edge_key ekey;
 	bool verbose = false;
 	bool uj = use_json(argc, argv);
 	json_object *json = NULL;
@@ -1045,8 +1036,9 @@ DEFUN (show_sharp_ted,
 				return CMD_WARNING_CONFIG_FAILED;
 			}
 			/* Get the Edge from the Link State Database */
-			key = ((uint64_t)ip_addr.s_addr) & 0xffffffff;
-			edge = ls_find_edge_by_key(sg.ted, key);
+			ekey.family = AF_INET;
+			IPV4_ADDR_COPY(&ekey.k.addr, &ip_addr);
+			edge = ls_find_edge_by_key(sg.ted, ekey);
 			if (!edge) {
 				vty_out(vty, "No edge found for ID %pI4\n",
 					&ip_addr);
@@ -1069,7 +1061,7 @@ DEFUN (show_sharp_ted,
 				return CMD_WARNING_CONFIG_FAILED;
 			}
 			/* Get the Subnet from the Link State Database */
-			subnet = ls_find_subnet(sg.ted, pref);
+			subnet = ls_find_subnet(sg.ted, &pref);
 			if (!subnet) {
 				vty_out(vty, "No subnet found for ID %pFX\n",
 					&pref);
@@ -1255,6 +1247,7 @@ DEFPY (show_sharp_cspf,
 	}
 	if (path->status != SUCCESS) {
 		vty_out(vty, "Path computation failed: %d\n", path->status);
+		cpath_del(path);
 		return CMD_SUCCESS;
 	}
 
@@ -1270,7 +1263,7 @@ DEFPY (show_sharp_cspf,
 				&edge->attributes->standard.remote6);
 	}
 	vty_out(vty, "\n");
-
+	cpath_del(path);
 	return CMD_SUCCESS;
 }
 
@@ -1335,6 +1328,64 @@ DEFPY (no_sharp_interface_protodown,
 	return CMD_SUCCESS;
 }
 
+DEFPY (tc_filter_rate,
+       tc_filter_rate_cmd,
+       "sharp tc dev IFNAME$ifname \
+        source <A.B.C.D/M|X:X::X:X/M>$src \
+        destination <A.B.C.D/M|X:X::X:X/M>$dst \
+        ip-protocol <tcp|udp>$ip_proto \
+        src-port (1-65535)$src_port \
+        dst-port (1-65535)$dst_port \
+        rate RATE$ratestr",
+       SHARP_STR
+       "Traffic control\n"
+       "TC interface (for qdisc, class, filter)\n"
+       "TC interface name\n"
+       "TC filter source\n"
+       "TC filter source IPv4 prefix\n"
+       "TC filter source IPv6 prefix\n"
+       "TC filter destination\n"
+       "TC filter destination IPv4 prefix\n"
+       "TC filter destination IPv6 prefix\n"
+       "TC filter IP protocol\n"
+       "TC filter IP protocol TCP\n"
+       "TC filter IP protocol UDP\n"
+       "TC filter source port\n"
+       "TC filter source port\n"
+       "TC filter destination port\n"
+       "TC filter destination port\n"
+       "TC rate\n"
+       "TC rate number (bits/s) or rate string (suffixed with Bps or bit)\n")
+{
+	struct interface *ifp;
+	struct protoent *p;
+	uint64_t rate;
+
+	ifp = if_lookup_vrf_all(ifname);
+
+	if (!ifp) {
+		vty_out(vty, "%% Can't find interface %s\n", ifname);
+		return CMD_WARNING;
+	}
+
+	p = getprotobyname(ip_proto);
+	if (!p) {
+		vty_out(vty, "Unable to convert %s to proto id\n", ip_proto);
+		return CMD_WARNING;
+	}
+
+	if (tc_getrate(ratestr, &rate) != 0) {
+		vty_out(vty, "Unable to convert %s to rate\n", ratestr);
+		return CMD_WARNING;
+	}
+
+	if (sharp_zebra_send_tc_filter_rate(ifp, src, dst, p->p_proto, src_port,
+					    dst_port, rate) != 0)
+		return CMD_WARNING;
+
+	return CMD_SUCCESS;
+}
+
 void sharp_vty_init(void)
 {
 	install_element(ENABLE_NODE, &install_routes_data_dump_cmd);
@@ -1369,6 +1420,8 @@ void sharp_vty_init(void)
 
 	install_element(ENABLE_NODE, &sharp_interface_protodown_cmd);
 	install_element(ENABLE_NODE, &no_sharp_interface_protodown_cmd);
+
+	install_element(ENABLE_NODE, &tc_filter_rate_cmd);
 
 	return;
 }

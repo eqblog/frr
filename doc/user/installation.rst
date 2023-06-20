@@ -314,7 +314,8 @@ options from the list below.
 
    Turn on the ability of FRR to access some shell options( telnet/ssh/bash/etc. )
    from vtysh itself.  This option is considered extremely unsecure and should only
-   be considered for usage if you really really know what you are doing.
+   be considered for usage if you really really know what you are doing.  This
+   option is deprecated and will be removed on Feb 1, 2024.
 
 .. option:: --enable-gcov
 
@@ -368,6 +369,13 @@ options from the list below.
 
    Turn on the usage of PCRE Posix libs for regex functionality.
 
+.. option:: --enable-pcre2posix
+
+   Turn on the usage of PCRE2 Posix libs for regex functionality.
+
+   PCRE2 versions <= 10.31 work a bit differently. We suggest using at least
+   >= 10.36.
+
 .. option:: --enable-rpath
 
    Set hardcoded rpaths in the executable [default=yes].
@@ -381,6 +389,18 @@ script. By default, the executables are placed in :file:`/usr/local/sbin`
 and the configuration files in :file:`/usr/local/etc`. The :file:`/usr/local/`
 installation prefix and other directories may be changed using the following
 options to the configuration script.
+
+.. option:: --enable-ccls
+
+   Enable the creation of a :file:`.ccls` file in the top level source
+   directory.
+
+   Some development environments (e.g., LSP server within emacs, et al.) can
+   utilize :clicmd:`ccls` to provide highly sophisticated IDE features (e.g.,
+   semantically accurate jump-to definition/reference, and even code
+   refactoring). The `--enable-ccls` causes :file:`configure` to generate a
+   configuration for the :clicmd:`ccls` command, based on the configured
+   FRR build environment.
 
 .. option:: --prefix <prefix>
 

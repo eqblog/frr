@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-2.0-or-later
 # Frr Reloader
 # Copyright (C) 2014 Cumulus Networks, Inc.
-#
-# This file is part of Frr.
-#
-# Frr is free software; you can redistribute it and/or modify it
-# under the terms of the GNU General Public License as published by the
-# Free Software Foundation; either version 2, or (at your option) any
-# later version.
-#
-# Frr is distributed in the hope that it will be useful, but
-# WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-# General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Frr; see the file COPYING.  If not, write to the Free
-# Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-#  02111-1307, USA.
 #
 """
 This program
@@ -804,6 +788,8 @@ def bgp_delete_nbr_remote_as_line(lines_to_add):
     # remote-as config.
 
     pg_dict = dict()
+    found_pg_cmd = False
+
     # Find all peer-group commands; create dict of each peer-group
     # to store assoicated neighbor as value
     for ctx_keys, line in lines_to_add:
@@ -824,6 +810,10 @@ def bgp_delete_nbr_remote_as_line(lines_to_add):
                     "remoteas": False,
                 }
                 found_pg_cmd = True
+
+    # Do nothing if there is no any "peer-group"
+    if found_pg_cmd is False:
+        return
 
     # Find peer-group with remote-as command, also search neighbor
     # associated to peer-group and store into peer-group dict
@@ -866,7 +856,7 @@ def bgp_delete_nbr_remote_as_line(lines_to_add):
                 for pg in pg_dict[ctx_keys[0]]:
                     if pg_dict[ctx_keys[0]][pg]["remoteas"] == True:
                         for nbr in pg_dict[ctx_keys[0]][pg]["nbr"]:
-                            if re_nbr_rmtas.group(1) in nbr:
+                            if re_nbr_rmtas.group(1) == nbr:
                                 lines_to_del_from_add.append((ctx_keys, line))
 
     for ctx_keys, line in lines_to_del_from_add:
@@ -1490,10 +1480,17 @@ def ignore_delete_re_add_lines(lines_to_add, lines_to_del):
                         lines_to_add_to_del.append((tmp_ctx_keys, line))
 
     for (ctx_keys, line) in lines_to_del_to_del:
-        lines_to_del.remove((ctx_keys, line))
+        try:
+            lines_to_del.remove((ctx_keys, line))
+        except ValueError:
+            pass
 
     for (ctx_keys, line) in lines_to_add_to_del:
-        lines_to_add.remove((ctx_keys, line))
+        try:
+            lines_to_add.remove((ctx_keys, line))
+        except ValueError:
+            pass
+
 
     return (lines_to_add, lines_to_del)
 
@@ -1514,6 +1511,7 @@ def ignore_unconfigurable_lines(lines_to_add, lines_to_del):
             [
                 ctx_keys[0].startswith(x)
                 for x in [
+                    "agentx",
                     "frr version",
                     "frr defaults",
                     "username",
@@ -1913,6 +1911,7 @@ if __name__ == "__main__":
         "bgpd",
         "fabricd",
         "isisd",
+        "babeld",
         "ospf6d",
         "ospfd",
         "pbrd",
@@ -1924,6 +1923,7 @@ if __name__ == "__main__":
         "staticd",
         "vrrpd",
         "ldpd",
+        "nhrpd",
         "pathd",
         "bfdd",
         "eigrpd",

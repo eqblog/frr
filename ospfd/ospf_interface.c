@@ -1,27 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * OSPF Interface functions.
  * Copyright (C) 1999, 2000 Toshiaki Takada
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published
- * by the Free Software Foundation; either version 2, or (at your
- * option) any later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
 
-#include "thread.h"
+#include "frrevent.h"
 #include "linklist.h"
 #include "prefix.h"
 #include "if.h"
@@ -30,6 +15,7 @@
 #include "command.h"
 #include "stream.h"
 #include "log.h"
+#include "network.h"
 #include "zclient.h"
 #include "bfd.h"
 #include "ldp_sync.h"
@@ -115,6 +101,9 @@ int ospf_if_get_output_cost(struct ospf_interface *oi)
 			cost = 1;
 		else if (cost > 65535)
 			cost = 65535;
+
+		if (if_is_loopback(oi->ifp))
+			cost = 0;
 	}
 
 	return cost;
@@ -274,7 +263,7 @@ struct ospf_interface *ospf_if_new(struct ospf *ospf, struct interface *ifp,
 	oi->t_ls_upd_event = NULL;
 	oi->t_ls_ack_direct = NULL;
 
-	oi->crypt_seqnum = time(NULL);
+	oi->crypt_seqnum = frr_sequence32_next();
 
 	ospf_opaque_type9_lsa_init(oi);
 
@@ -303,7 +292,7 @@ void ospf_if_cleanup(struct ospf_interface *oi)
 	/* oi->nbrs and oi->nbr_nbma should be deleted on InterfaceDown event */
 	/* delete all static neighbors attached to this interface */
 	for (ALL_LIST_ELEMENTS(oi->nbr_nbma, node, nnode, nbr_nbma)) {
-		THREAD_OFF(nbr_nbma->t_poll);
+		EVENT_OFF(nbr_nbma->t_poll);
 
 		if (nbr_nbma->nbr) {
 			nbr_nbma->nbr->nbr_nbma = NULL;
@@ -370,7 +359,7 @@ void ospf_if_free(struct ospf_interface *oi)
 	listnode_delete(oi->ospf->oiflist, oi);
 	listnode_delete(oi->area->oiflist, oi);
 
-	thread_cancel_event(master, oi);
+	event_cancel_event(master, oi);
 
 	memset(oi, 0, sizeof(*oi));
 	XFREE(MTYPE_OSPF_IF, oi);
@@ -506,7 +495,7 @@ void ospf_interface_fifo_flush(struct ospf_interface *oi)
 	if (oi->on_write_q) {
 		listnode_delete(ospf->oi_write_q, oi);
 		if (list_isempty(ospf->oi_write_q))
-			THREAD_OFF(ospf->t_write);
+			EVENT_OFF(ospf->t_write);
 		oi->on_write_q = 0;
 	}
 }
@@ -541,6 +530,7 @@ static struct ospf_if_params *ospf_new_if_params(void)
 	UNSET_IF_PARAM(oip, passive_interface);
 	UNSET_IF_PARAM(oip, v_hello);
 	UNSET_IF_PARAM(oip, fast_hello);
+	UNSET_IF_PARAM(oip, v_gr_hello_delay);
 	UNSET_IF_PARAM(oip, v_wait);
 	UNSET_IF_PARAM(oip, priority);
 	UNSET_IF_PARAM(oip, type);
@@ -555,6 +545,7 @@ static struct ospf_if_params *ospf_new_if_params(void)
 	oip->is_v_wait_set = false;
 
 	oip->ptp_dmvpn = 0;
+	oip->p2mp_delay_reflood = OSPF_P2MP_DELAY_REFLOOD_DEFAULT;
 
 	return oip;
 }
@@ -665,6 +656,8 @@ int ospf_if_new_hook(struct interface *ifp)
 
 	ifp->info = XCALLOC(MTYPE_OSPF_IF_INFO, sizeof(struct ospf_if_info));
 
+	IF_OSPF_IF_INFO(ifp)->oii_fd = -1;
+
 	IF_OIFS(ifp) = route_table_init();
 	IF_OIFS_PARAMS(ifp) = route_table_init();
 
@@ -688,6 +681,9 @@ int ospf_if_new_hook(struct interface *ifp)
 	SET_IF_PARAM(IF_DEF_PARAMS(ifp), fast_hello);
 	IF_DEF_PARAMS(ifp)->fast_hello = OSPF_FAST_HELLO_DEFAULT;
 
+	SET_IF_PARAM(IF_DEF_PARAMS(ifp), v_gr_hello_delay);
+	IF_DEF_PARAMS(ifp)->v_gr_hello_delay = OSPF_HELLO_DELAY_DEFAULT;
+
 	SET_IF_PARAM(IF_DEF_PARAMS(ifp), v_wait);
 	IF_DEF_PARAMS(ifp)->v_wait = OSPF_ROUTER_DEAD_INTERVAL_DEFAULT;
 
@@ -705,6 +701,8 @@ static int ospf_if_delete_hook(struct interface *ifp)
 {
 	int rc = 0;
 	struct route_node *rn;
+	struct ospf_if_info *oii;
+
 	rc = ospf_opaque_del_if(ifp);
 
 	/*
@@ -720,6 +718,13 @@ static int ospf_if_delete_hook(struct interface *ifp)
 
 	route_table_finish(IF_OIFS(ifp));
 	route_table_finish(IF_OIFS_PARAMS(ifp));
+
+	/* Close per-interface socket */
+	oii = ifp->info;
+	if (oii && oii->oii_fd > 0) {
+		close(oii->oii_fd);
+		oii->oii_fd = -1;
+	}
 
 	XFREE(MTYPE_OSPF_IF_INFO, ifp->info);
 
@@ -991,7 +996,6 @@ static void ospf_vl_if_delete(struct ospf_vl_data *vl_data)
 	if_delete(&ifp);
 	if (!vrf_is_enabled(vrf))
 		vrf_delete(vrf);
-	vlink_count--;
 }
 
 /* for a defined area, count the number of configured vl
@@ -1342,18 +1346,28 @@ static int ospf_ifp_create(struct interface *ifp)
 
 	if (IS_DEBUG_OSPF(zebra, ZEBRA_INTERFACE))
 		zlog_debug(
-			"Zebra: interface add %s vrf %s[%u] index %d flags %llx metric %d mtu %d speed %u",
+			"Zebra: interface add %s vrf %s[%u] index %d flags %llx metric %d mtu %d speed %u status 0x%x",
 			ifp->name, ifp->vrf->name, ifp->vrf->vrf_id,
 			ifp->ifindex, (unsigned long long)ifp->flags,
-			ifp->metric, ifp->mtu, ifp->speed);
+			ifp->metric, ifp->mtu, ifp->speed, ifp->status);
 
 	assert(ifp->info);
 
 	oii = ifp->info;
 	oii->curr_mtu = ifp->mtu;
 
-	if (IF_DEF_PARAMS(ifp)
-	    && !OSPF_IF_PARAM_CONFIGURED(IF_DEF_PARAMS(ifp), type)) {
+	/* Change ospf type param based on following
+	 * condition:
+	 * ospf type params is not set (first creation),
+	 * OR ospf param type is changed based on
+	 * link event, currently only handle for
+	 * loopback interface type, for other ospf interface,
+	 * type can be set from user config which needs to be
+	 * preserved.
+	 */
+	if (IF_DEF_PARAMS(ifp) &&
+	    (!OSPF_IF_PARAM_CONFIGURED(IF_DEF_PARAMS(ifp), type) ||
+	     if_is_loopback(ifp))) {
 		SET_IF_PARAM(IF_DEF_PARAMS(ifp), type);
 		IF_DEF_PARAMS(ifp)->type = ospf_default_iftype(ifp);
 	}
@@ -1382,6 +1396,16 @@ static int ospf_ifp_up(struct interface *ifp)
 	struct ospf_interface *oi;
 	struct route_node *rn;
 	struct ospf_if_info *oii = ifp->info;
+	struct ospf *ospf;
+
+	if (IS_DEBUG_OSPF(zebra, ZEBRA_INTERFACE))
+		zlog_debug("Zebra: Interface[%s] state change to up.",
+			   ifp->name);
+
+	/* Open per-intf write socket if configured */
+	ospf = ifp->vrf->info;
+	if (ospf && ospf->intf_socket_enabled)
+		ospf_ifp_sock_init(ifp);
 
 	ospf_if_recalculate_output_cost(ifp);
 
@@ -1398,10 +1422,6 @@ static int ospf_ifp_up(struct interface *ifp)
 
 		return 0;
 	}
-
-	if (IS_DEBUG_OSPF(zebra, ZEBRA_INTERFACE))
-		zlog_debug("Zebra: Interface[%s] state change to up.",
-			   ifp->name);
 
 	for (rn = route_top(IF_OIFS(ifp)); rn; rn = route_next(rn)) {
 		if ((oi = rn->info) == NULL)
@@ -1430,6 +1450,9 @@ static int ospf_ifp_down(struct interface *ifp)
 			continue;
 		ospf_if_down(oi);
 	}
+
+	/* Close per-interface write socket if configured */
+	ospf_ifp_sock_close(ifp);
 
 	return 0;
 }
@@ -1485,7 +1508,7 @@ void ospf_reset_hello_timer(struct interface *ifp, struct in_addr addr,
 			ospf_hello_send(oi);
 
 			/* Restart hello timer for this interface */
-			THREAD_OFF(oi->t_hello);
+			EVENT_OFF(oi->t_hello);
 			OSPF_HELLO_TIMER_ON(oi);
 		}
 
@@ -1509,7 +1532,7 @@ void ospf_reset_hello_timer(struct interface *ifp, struct in_addr addr,
 		ospf_hello_send(oi);
 
 		/* Restart the hello timer. */
-		THREAD_OFF(oi->t_hello);
+		EVENT_OFF(oi->t_hello);
 		OSPF_HELLO_TIMER_ON(oi);
 	}
 }

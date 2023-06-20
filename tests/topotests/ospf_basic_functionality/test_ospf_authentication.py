@@ -1,23 +1,10 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: ISC
 
 #
 # Copyright (c) 2020 by VMware, Inc. ("VMware")
 # Used Copyright (c) 2018 by Network Device Education Foundation, Inc.
 # ("NetDEF") in this file.
-#
-# Permission to use, copy, modify, and/or distribute this software
-# for any purpose with or without fee is hereby granted, provided
-# that the above copyright notice and this permission notice appear
-# in all copies.
-#
-# THE SOFTWARE IS PROVIDED "AS IS" AND VMWARE DISCLAIMS ALL WARRANTIES
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL VMWARE BE LIABLE FOR
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
-# DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
-# ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
-# OF THIS SOFTWARE.
 #
 
 
@@ -47,7 +34,6 @@ from lib.common_config import (
     reset_config_on_routers,
     step,
     shutdown_bringup_interface,
-    topo_daemons,
 )
 from lib.topolog import logger
 from lib.topojson import build_config_from_json
@@ -102,12 +88,9 @@ def setup_module(mod):
     topo = tgen.json_topo
     # ... and here it calls Mininet initialization functions.
 
-    # get list of daemons needs to be started for this suite.
-    daemons = topo_daemons(tgen, topo)
-
     # Starting topology, create tmp files which are loaded to routers
     #  to start daemons and then start routers
-    start_topology(tgen, daemons)
+    start_topology(tgen)
 
     # Creating configuration from JSON
     build_config_from_json(tgen, topo)
@@ -117,7 +100,7 @@ def setup_module(mod):
         pytest.skip(tgen.errors)
 
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "setup_module :Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -183,7 +166,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
     step("Verify that the neighbour is not FULL between R1 and R2.")
     dut = "r1"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut, expected=False)
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -209,7 +192,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -240,7 +223,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
     ospf_covergence = verify_ospf_neighbor(
         tgen, topo, dut=dut, expected=False, retry_timeout=10
     )
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -262,7 +245,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -277,7 +260,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
         "show ip ospf neighbor cmd."
     )
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut, expected=False)
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -291,7 +274,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -331,7 +314,7 @@ def test_ospf_authentication_simple_pass_tc28_p1(request):
 
     dut = "r1"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -378,7 +361,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
     ospf_covergence = verify_ospf_neighbor(
         tgen, topo, dut=dut, expected=False, retry_timeout=6
     )
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -410,7 +393,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -443,7 +426,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
     ospf_covergence = verify_ospf_neighbor(
         tgen, topo, dut=dut, expected=False, retry_timeout=10
     )
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -471,7 +454,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -486,7 +469,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
         "show ip ospf neighbor cmd."
     )
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut, expected=False)
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -500,7 +483,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -545,7 +528,7 @@ def test_ospf_authentication_md5_tc29_p1(request):
 
     dut = "r1"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -593,7 +576,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
     ospf_covergence = verify_ospf_neighbor(
         tgen, topo, dut=dut, expected=False, retry_timeout=10
     )
-    assert ospf_covergence is not True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is not True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -625,7 +608,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -672,7 +655,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -704,7 +687,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -737,7 +720,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -782,7 +765,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -827,7 +810,7 @@ def test_ospf_authentication_different_auths_tc30_p1(request):
 
     dut = "r2"
     ospf_covergence = verify_ospf_neighbor(tgen, topo, dut=dut)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 

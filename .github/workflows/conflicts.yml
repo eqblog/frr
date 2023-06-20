@@ -1,4 +1,4 @@
-name: Add a conflict label is PR needs to rebase
+name: Add a conflict label if PR needs to rebase
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 
 jobs:
   conflicts:
+    if: github.repository == 'frrouting/frr'
     runs-on: ubuntu-latest
     permissions:
       contents: read

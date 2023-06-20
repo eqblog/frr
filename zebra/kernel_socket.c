@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* Kernel communication using routing socket.
  * Copyright (C) 1999 Kunihiro Ishiguro
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
@@ -1226,7 +1211,8 @@ int rtm_write(int message, union sockunion *dest, union sockunion *mask,
 	case BLACKHOLE_REJECT:
 		msg.rtm.rtm_flags |= RTF_REJECT;
 		break;
-	default:
+	case BLACKHOLE_NULL:
+	case BLACKHOLE_ADMINPROHIB:
 		msg.rtm.rtm_flags |= RTF_BLACKHOLE;
 		break;
 	}
@@ -1269,7 +1255,7 @@ int rtm_write(int message, union sockunion *dest, union sockunion *mask,
 }
 
 
-#include "thread.h"
+#include "frrevent.h"
 #include "zebra/zserv.h"
 
 /* For debug purpose. */
@@ -1295,7 +1281,7 @@ static void rtmsg_debug(struct rt_msghdr *rtm)
 #endif /* RTAX_MAX */
 
 /* Kernel routing table and interface updates via routing socket. */
-static void kernel_read(struct thread *thread)
+static void kernel_read(struct event *thread)
 {
 	int sock;
 	int nbytes;
@@ -1340,7 +1326,7 @@ static void kernel_read(struct thread *thread)
 	} buf;
 
 	/* Fetch routing socket. */
-	sock = THREAD_FD(thread);
+	sock = EVENT_FD(thread);
 
 	nbytes = read(sock, &buf, sizeof(buf));
 
@@ -1352,8 +1338,8 @@ static void kernel_read(struct thread *thread)
 			 * shortage and is not harmful for consistency of
 			 * reading the routing socket.  Ignore it.
 			 */
-			thread_add_read(zrouter.master, kernel_read, NULL, sock,
-					NULL);
+			event_add_read(zrouter.master, kernel_read, NULL, sock,
+				       NULL);
 			return;
 #else
 			flog_err(EC_ZEBRA_RECVMSG_OVERRUN,
@@ -1376,7 +1362,7 @@ static void kernel_read(struct thread *thread)
 	if (nbytes == 0)
 		return;
 
-	thread_add_read(zrouter.master, kernel_read, NULL, sock, NULL);
+	event_add_read(zrouter.master, kernel_read, NULL, sock, NULL);
 
 	if (IS_ZEBRA_DEBUG_KERNEL)
 		rtmsg_debug(&buf.r.rtm);
@@ -1479,7 +1465,7 @@ static void routing_socket(struct zebra_ns *zns)
 	}
 
 	/* kernel_read needs rewrite. */
-	thread_add_read(zrouter.master, kernel_read, NULL, routing_sock, NULL);
+	event_add_read(zrouter.master, kernel_read, NULL, routing_sock, NULL);
 }
 
 /* Exported interface function.  This function simply calls
@@ -1516,13 +1502,13 @@ int kernel_dplane_read(struct zebra_dplane_info *info)
 	return 0;
 }
 
-void kernel_update_multi(struct dplane_ctx_q *ctx_list)
+void kernel_update_multi(struct dplane_ctx_list_head *ctx_list)
 {
 	struct zebra_dplane_ctx *ctx;
-	struct dplane_ctx_q handled_list;
+	struct dplane_ctx_list_head handled_list;
 	enum zebra_dplane_result res = ZEBRA_DPLANE_REQUEST_SUCCESS;
 
-	TAILQ_INIT(&handled_list);
+	dplane_ctx_q_init(&handled_list);
 
 	while (true) {
 		ctx = dplane_ctx_dequeue(ctx_list);
@@ -1594,9 +1580,14 @@ void kernel_update_multi(struct dplane_ctx_q *ctx_list)
 			res = kernel_intf_update(ctx);
 			break;
 
-		case DPLANE_OP_TC_INSTALL:
-		case DPLANE_OP_TC_UPDATE:
-		case DPLANE_OP_TC_DELETE:
+		case DPLANE_OP_TC_QDISC_INSTALL:
+		case DPLANE_OP_TC_QDISC_UNINSTALL:
+		case DPLANE_OP_TC_CLASS_ADD:
+		case DPLANE_OP_TC_CLASS_DELETE:
+		case DPLANE_OP_TC_CLASS_UPDATE:
+		case DPLANE_OP_TC_FILTER_ADD:
+		case DPLANE_OP_TC_FILTER_DELETE:
+		case DPLANE_OP_TC_FILTER_UPDATE:
 			res = kernel_tc_update(ctx);
 			break;
 
@@ -1637,7 +1628,7 @@ void kernel_update_multi(struct dplane_ctx_q *ctx_list)
 		dplane_ctx_enqueue_tail(&handled_list, ctx);
 	}
 
-	TAILQ_INIT(ctx_list);
+	dplane_ctx_q_init(ctx_list);
 	dplane_ctx_list_append(ctx_list, &handled_list);
 }
 

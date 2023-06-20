@@ -1,23 +1,10 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: ISC
 
 #
 # Copyright (c) 2020 by VMware, Inc. ("VMware")
 # Used Copyright (c) 2018 by Network Device Education Foundation, Inc.
 # ("NetDEF") in this file.
-#
-# Permission to use, copy, modify, and/or distribute this software
-# for any purpose with or without fee is hereby granted, provided
-# that the above copyright notice and this permission notice appear
-# in all copies.
-#
-# THE SOFTWARE IS PROVIDED "AS IS" AND VMWARE DISCLAIMS ALL WARRANTIES
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL VMWARE BE LIABLE FOR
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
-# DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
-# ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
-# OF THIS SOFTWARE.
 #
 
 
@@ -48,7 +35,6 @@ from lib.common_config import (
     create_static_routes,
     step,
     shutdown_bringup_interface,
-    topo_daemons,
 )
 from lib.bgp import verify_bgp_convergence, create_router_bgp
 from lib.topolog import logger
@@ -125,12 +111,9 @@ def setup_module(mod):
     topo = tgen.json_topo
     # ... and here it calls Mininet initialization functions.
 
-    # get list of daemons needs to be started for this suite.
-    daemons = topo_daemons(tgen, topo)
-
     # Starting topology, create tmp files which are loaded to routers
     #  to start daemons and then start routers
-    start_topology(tgen, daemons)
+    start_topology(tgen)
 
     # Creating configuration from JSON
     build_config_from_json(tgen, topo)
@@ -140,7 +123,7 @@ def setup_module(mod):
         pytest.skip(tgen.errors)
     # Api call verify whether OSPF is converged
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "setup_module :Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -188,7 +171,7 @@ def test_ospf_redistribution_tc5_p0(request):
 
     step("Verify that OSPF neighbors are FULL.")
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -312,7 +295,7 @@ def test_ospf_redistribution_tc6_p0(request):
 
     step("Verify that OSPF neighbors are FULL.")
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -541,7 +524,7 @@ def test_ospf_redistribution_tc8_p1(request):
     step("Verify that OSPF neighbours are reset and forms new adjacencies.")
     # Api call verify whether OSPF is converged
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 
@@ -575,7 +558,7 @@ def test_ospf_rfc2328_appendinxE_p0(request):
     step("Verify that OSPF neighbours are Full.")
     # Api call verify whether OSPF is converged
     ospf_covergence = verify_ospf_neighbor(tgen, topo)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "Testcase Failed \n Error  {}".format(
         ospf_covergence
     )
 

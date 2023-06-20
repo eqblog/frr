@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* Zebra's client header.
  * Copyright (C) 1999 Kunihiro Ishiguro
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef _ZEBRA_ZCLIENT_H
@@ -35,6 +20,8 @@ struct zclient;
 
 /* For union g_addr */
 #include "nexthop.h"
+/* For resilience */
+#include "nexthop_group.h"
 
 /* For union pw_protocol_fields */
 #include "pw.h"
@@ -99,8 +86,6 @@ enum zserv_client_capabilities {
 
 extern struct sockaddr_storage zclient_addr;
 extern socklen_t zclient_addr_len;
-
-#define ZAPI_ORR_FLAG_UNICAST 0x01
 
 /* Zebra message types. */
 typedef enum {
@@ -241,6 +226,12 @@ typedef enum {
 	ZEBRA_GRE_GET,
 	ZEBRA_GRE_UPDATE,
 	ZEBRA_GRE_SOURCE_SET,
+	ZEBRA_TC_QDISC_INSTALL,
+	ZEBRA_TC_QDISC_UNINSTALL,
+	ZEBRA_TC_CLASS_ADD,
+	ZEBRA_TC_CLASS_DELETE,
+	ZEBRA_TC_FILTER_ADD,
+	ZEBRA_TC_FILTER_DELETE,
 } zebra_message_types_t;
 
 enum zebra_error_types {
@@ -299,7 +290,7 @@ typedef int (zclient_handler)(ZAPI_CALLBACK_ARGS);
 /* Structure for the zebra client. */
 struct zclient {
 	/* The thread master we schedule ourselves on */
-	struct thread_master *master;
+	struct event_loop *master;
 
 	/* Privileges to change socket values */
 	struct zebra_privs_t *privs;
@@ -332,11 +323,11 @@ struct zclient {
 	struct buffer *wb;
 
 	/* Read and connect thread. */
-	struct thread *t_read;
-	struct thread *t_connect;
+	struct event *t_read;
+	struct event *t_connect;
 
 	/* Thread to write buffered data to zebra. */
-	struct thread *t_write;
+	struct event *t_write;
 
 	/* Redistribute information. */
 	uint8_t redist_default; /* clients protocol */
@@ -421,6 +412,7 @@ struct zapi_nexthop {
 
 	/* MPLS labels for BGP-LU or Segment Routing */
 	uint8_t label_num;
+	enum lsp_types_t label_type;
 	mpls_label_t labels[MPLS_MAX_LABELS];
 
 	struct ethaddr rmac;
@@ -462,6 +454,8 @@ struct zapi_nexthop {
 struct zapi_nhg {
 	uint16_t proto;
 	uint32_t id;
+
+	struct nhg_resilience resilience;
 
 	uint16_t nexthop_num;
 	struct zapi_nexthop nexthops[MULTIPATH_NUM];
@@ -539,6 +533,13 @@ struct zapi_route {
  * offload situation.
  */
 #define ZEBRA_FLAG_OFFLOAD_FAILED     0x200
+
+/*
+ * This flag lets us know that we think the route entry
+ * received has caused us to be out of sync with the
+ * kernel (NLM_F_APPEND at the very least )
+ */
+#define ZEBRA_FLAG_OUTOFSYNC          0x400
 
 	/* The older XXX_MESSAGE flags live here */
 	uint32_t message;
@@ -861,7 +862,7 @@ int zclient_neigh_ip_encode(struct stream *s, uint16_t cmd, union sockunion *in,
 
 extern uint32_t zclient_get_nhg_start(uint32_t proto);
 
-extern struct zclient *zclient_new(struct thread_master *m,
+extern struct zclient *zclient_new(struct event_loop *m,
 				   struct zclient_options *opt,
 				   zclient_handler *const *handlers,
 				   size_t n_handlers);
@@ -900,7 +901,7 @@ zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id, afi_t afi,
 
 extern enum zclient_send_status
 zclient_send_localsid(struct zclient *zclient, const struct in6_addr *sid,
-		      ifindex_t oif, enum seg6local_action_t action,
+		      vrf_id_t vrf_id, enum seg6local_action_t action,
 		      const struct seg6local_context *context);
 
 extern void zclient_send_reg_requests(struct zclient *, vrf_id_t);
@@ -1231,10 +1232,6 @@ enum zapi_opaque_registry {
 	LDP_RLFA_UNREGISTER_ALL = 8,
 	/* Announce LDP labels associated to a previously registered RLFA */
 	LDP_RLFA_LABELS = 9,
-	/* Register for IGP METRIC with OSPF/ISIS */
-	ORR_IGP_METRIC_REGISTER = 10,
-	/* Send SPF data to BGP */
-	ORR_IGP_METRIC_UPDATE = 11
 };
 
 /* Send the hello message.

@@ -1,24 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* Configuration generator.
  * Copyright (C) 2000 Kunihiro Ishiguro
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
+#include <sys/wait.h>
 
 #include "command.h"
 #include "linklist.h"
@@ -261,6 +247,11 @@ static void config_add_line_uniq_end(struct list *config, const char *line)
 		listnode_move_to_tail(config, node);
 }
 
+static void config_add_line_head(struct list *config, const char *line)
+{
+	listnode_add_head(config, XSTRDUP(MTYPE_VTYSH_CONFIG_LINE, line));
+}
+
 void vtysh_config_parse_line(void *arg, const char *line)
 {
 	char c;
@@ -324,21 +315,32 @@ void vtysh_config_parse_line(void *arg, const char *line)
 			} else if (!strncmp(line, " ip mroute",
 					    strlen(" ip mroute"))) {
 				config_add_line_uniq_end(config->line, line);
-			} else if (config->index == RMAP_NODE
-				   || config->index == INTERFACE_NODE
-				   || config->index == VTY_NODE
-				   || config->index == NH_GROUP_NODE)
+			} else if (config->index == RMAP_NODE ||
+				   config->index == INTERFACE_NODE ||
+				   config->index == VTY_NODE)
 				config_add_line_uniq(config->line, line);
-			else
+			else if (config->index == NH_GROUP_NODE) {
+				if (strncmp(line, " resilient",
+					    strlen(" resilient")) == 0)
+					config_add_line_head(config->line,
+							     line);
+				else
+					config_add_line_uniq_end(config->line,
+								 line);
+			} else
 				config_add_line(config->line, line);
 		} else
 			config_add_line(config_top, line);
 		break;
 	default:
 		if (strncmp(line, "exit", strlen("exit")) == 0) {
-			if (config)
+			if (config) {
+				if (config->exit)
+					XFREE(MTYPE_VTYSH_CONFIG_LINE,
+					      config->exit);
 				config->exit =
 					XSTRDUP(MTYPE_VTYSH_CONFIG_LINE, line);
+			}
 		} else if (strncmp(line, "interface", strlen("interface")) == 0)
 			config = config_get(INTERFACE_NODE, line);
 		else if (strncmp(line, "pseudowire", strlen("pseudowire")) == 0)
@@ -379,6 +381,9 @@ void vtysh_config_parse_line(void *arg, const char *line)
 		else if (strncmp(line, "router openfabric", strlen("router openfabric"))
 			 == 0)
 			config = config_get(OPENFABRIC_NODE, line);
+		else if (strncmp(line, "affinity-map",
+				 strlen("affinity-map")) == 0)
+			config = config_get(AFFMAP_NODE, line);
 		else if (strncmp(line, "route-map", strlen("route-map")) == 0)
 			config = config_get(RMAP_NODE, line);
 		else if (strncmp(line, "no route-map", strlen("no route-map"))
@@ -492,8 +497,8 @@ void vtysh_config_parse_line(void *arg, const char *line)
 				    strlen("no ip prefix-list")) == 0 ||
 			    strncmp(line, "no ipv6 prefix-list",
 				    strlen("no ipv6 prefix-list")) == 0 ||
-			    strncmp(line, "service cputime-stats",
-				    strlen("service cputime-stats")) == 0 ||
+			    strncmp(line, "service ", strlen("service ")) ==
+				    0 ||
 			    strncmp(line, "no service cputime-stats",
 				    strlen("no service cputime-stats")) == 0 ||
 			    strncmp(line, "service cputime-warning",
@@ -510,14 +515,15 @@ void vtysh_config_parse_line(void *arg, const char *line)
 /* Macro to check delimiter is needed between each configuration line
  * or not. */
 #define NO_DELIMITER(I)                                                        \
-	((I) == ACCESS_NODE || (I) == PREFIX_NODE || (I) == IP_NODE            \
-	 || (I) == AS_LIST_NODE || (I) == COMMUNITY_LIST_NODE                  \
-	 || (I) == COMMUNITY_ALIAS_NODE || (I) == ACCESS_IPV6_NODE             \
-	 || (I) == ACCESS_MAC_NODE || (I) == PREFIX_IPV6_NODE                  \
-	 || (I) == FORWARDING_NODE || (I) == DEBUG_NODE || (I) == AAA_NODE     \
-	 || (I) == VRF_DEBUG_NODE || (I) == NORTHBOUND_DEBUG_NODE              \
-	 || (I) == RMAP_DEBUG_NODE || (I) == RESOLVER_DEBUG_NODE               \
-	 || (I) == MPLS_NODE || (I) == KEYCHAIN_KEY_NODE)
+	((I) == AFFMAP_NODE || (I) == ACCESS_NODE || (I) == PREFIX_NODE ||     \
+	 (I) == IP_NODE || (I) == AS_LIST_NODE ||                              \
+	 (I) == COMMUNITY_LIST_NODE || (I) == COMMUNITY_ALIAS_NODE ||          \
+	 (I) == ACCESS_IPV6_NODE || (I) == ACCESS_MAC_NODE ||                  \
+	 (I) == PREFIX_IPV6_NODE || (I) == FORWARDING_NODE ||                  \
+	 (I) == DEBUG_NODE || (I) == AAA_NODE || (I) == VRF_DEBUG_NODE ||      \
+	 (I) == NORTHBOUND_DEBUG_NODE || (I) == RMAP_DEBUG_NODE ||             \
+	 (I) == RESOLVER_DEBUG_NODE || (I) == MPLS_NODE ||                     \
+	 (I) == KEYCHAIN_KEY_NODE)
 
 static void configvec_dump(vector vec, bool nested)
 {
@@ -620,18 +626,20 @@ static int vtysh_read_file(FILE *confp, bool dry_run)
 	return (ret);
 }
 
-/* Read up configuration file from config_default_dir. */
-int vtysh_read_config(const char *config_default_dir, bool dry_run)
+/*
+ * Read configuration file and send it to all connected daemons
+ */
+static int vtysh_read_config(const char *config_file_path, bool dry_run)
 {
 	FILE *confp = NULL;
 	bool save;
 	int ret;
 
-	confp = fopen(config_default_dir, "r");
+	confp = fopen(config_file_path, "r");
 	if (confp == NULL) {
 		fprintf(stderr,
 			"%% Can't open configuration file %s due to '%s'.\n",
-			config_default_dir, safe_strerror(errno));
+			config_file_path, safe_strerror(errno));
 		return CMD_ERR_NO_FILE;
 	}
 
@@ -643,7 +651,103 @@ int vtysh_read_config(const char *config_default_dir, bool dry_run)
 
 	vtysh_add_timestamp = save;
 
-	return (ret);
+	return ret;
+}
+
+int vtysh_apply_config(const char *config_file_path, bool dry_run, bool do_fork)
+{
+	/*
+	 * We need to apply the whole config file to all daemons. Instead of
+	 * having one client talk to N daemons, we fork N times and let each
+	 * child handle one daemon.
+	 */
+	pid_t fork_pid = getpid();
+	int status = 0;
+	int ret;
+	int my_client_type;
+	char my_client[64];
+
+	if (do_fork) {
+		for (unsigned int i = 0; i < array_size(vtysh_client); i++) {
+			/* Store name of client this fork will handle */
+			strlcpy(my_client, vtysh_client[i].name,
+				sizeof(my_client));
+			my_client_type = vtysh_client[i].flag;
+			fork_pid = fork();
+
+			/* If child, break */
+			if (fork_pid == 0)
+				break;
+		}
+
+		/* parent, wait for children */
+		if (fork_pid != 0) {
+			int keep_status = 0;
+
+			fprintf(stdout,
+				"Waiting for children to finish applying config...\n");
+			while (wait(&status) > 0) {
+				if (!keep_status && WEXITSTATUS(status))
+					keep_status = WEXITSTATUS(status);
+			}
+
+			/*
+			 * This will return the first status received
+			 * that failed( if that happens ).  This is
+			 * good enough for the moment
+			 */
+			return keep_status;
+		}
+
+		/*
+		 * children, grow up to be cowboys
+		 */
+		for (unsigned int i = 0; i < array_size(vtysh_client); i++) {
+			if (my_client_type != vtysh_client[i].flag) {
+				struct vtysh_client *cl;
+
+				/*
+				 * If this is a client we aren't responsible
+				 * for, disconnect
+				 */
+				for (cl = &vtysh_client[i]; cl; cl = cl->next) {
+					if (cl->fd >= 0)
+						close(cl->fd);
+					cl->fd = -1;
+				}
+			} else if (vtysh_client[i].fd == -1 &&
+				   vtysh_client[i].next == NULL) {
+				/*
+				 * If this is the client we are responsible
+				 * for, but we aren't already connected to that
+				 * client, that means the client isn't up in
+				 * the first place and we can exit early
+				 */
+				exit(0);
+			}
+		}
+
+		fprintf(stdout, "[%d|%s] sending configuration\n", getpid(),
+			my_client);
+	}
+
+	ret = vtysh_read_config(config_file_path, dry_run);
+
+	if (ret) {
+		if (do_fork)
+			fprintf(stderr,
+				"[%d|%s] Configuration file[%s] processing failure: %d\n",
+				getpid(), my_client, frr_config, ret);
+		else
+			fprintf(stderr,
+				"Configuration file[%s] processing failure: %d\n",
+				frr_config, ret);
+	} else if (do_fork) {
+		fprintf(stderr, "[%d|%s] done\n", getpid(), my_client);
+		exit(0);
+	}
+
+	return ret;
 }
 
 /* We don't write vtysh specific into file from vtysh. vtysh.conf should
@@ -652,18 +756,21 @@ int vtysh_read_config(const char *config_default_dir, bool dry_run)
  */
 void vtysh_config_write(void)
 {
+	const char *name;
 	char line[512];
 
-	if (cmd_hostname_get()) {
-		snprintf(line, sizeof(line), "hostname %s", cmd_hostname_get());
+	name = cmd_hostname_get();
+	if (name && name[0] != '\0') {
+		snprintf(line, sizeof(line), "hostname %s", name);
 		vtysh_config_parse_line(NULL, line);
 	}
 
-	if (cmd_domainname_get()) {
-		snprintf(line, sizeof(line), "domainname %s",
-			 cmd_domainname_get());
+	name = cmd_domainname_get();
+	if (name && name[0] != '\0') {
+		snprintf(line, sizeof(line), "domainname %s", name);
 		vtysh_config_parse_line(NULL, line);
 	}
+
 	if (vtysh_write_integrated == WRITE_INTEGRATED_NO)
 		vtysh_config_parse_line(NULL,
 					"no service integrated-vtysh-config");

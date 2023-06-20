@@ -1,23 +1,10 @@
 #!/usr/bin/env python
+# SPDX-License-Identifier: ISC
 
 #
 # Copyright (c) 2020 by VMware, Inc. ("VMware")
 # Used Copyright (c) 2018 by Network Device Education Foundation,
 # Inc. ("NetDEF") in this file.
-#
-# Permission to use, copy, modify, and/or distribute this software
-# for any purpose with or without fee is hereby granted, provided
-# that the above copyright notice and this permission notice appear
-# in all copies.
-#
-# THE SOFTWARE IS PROVIDED "AS IS" AND VMWARE DISCLAIMS ALL WARRANTIES
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL VMWARE BE LIABLE FOR
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
-# DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
-# ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
-# OF THIS SOFTWARE.
 #
 
 """
@@ -55,6 +42,8 @@ import time
 import datetime
 import pytest
 from time import sleep
+import json
+import functools
 
 pytestmark = pytest.mark.pimd
 
@@ -67,8 +56,8 @@ sys.path.append(os.path.join(CWD, "../lib/"))
 
 # pylint: disable=C0413
 # Import topogen and topotest helpers
-from lib.topogen import Topogen, get_topogen
-
+from lib import topotest
+from lib.topogen import Topogen, TopoRouter, get_topogen
 from lib.common_config import (
     start_topology,
     write_test_header,
@@ -171,7 +160,7 @@ def setup_module(mod):
     # Required linux kernel version for this suite to run.
     result = required_linux_kernel_version("4.19")
     if result is not True:
-        pytest.skip("Kernel requirements are not met")
+        pytest.skip("Kernel version should be >= 4.19")
 
     testsuite_run_time = time.asctime(time.localtime(time.time()))
     logger.info("Testsuite start time: {}".format(testsuite_run_time))
@@ -186,12 +175,9 @@ def setup_module(mod):
     topo = tgen.json_topo
     # ... and here it calls Mininet initialization functions.
 
-    # get list of daemons needs to be started for this suite.
-    daemons = topo_daemons(tgen, topo)
-
     # Starting topology, create tmp files which are loaded to routers
     #  to start daemons and then start routers
-    start_topology(tgen, daemons)
+    start_topology(tgen)
 
     # Don"t run this test if we have any failure.
     if tgen.routers_have_failure():
@@ -552,12 +538,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
 
     input_traffic = {"l1": {"traffic_sent": [intf_l1_i1]}}
     result = verify_multicast_traffic(tgen, input_traffic, expected=False)
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " " Traffic is not stopped yet \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: Multicast traffic should be stopped \n "
+        "Found: {}".format(tc_name, "l1", result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step(
         "IGMP groups are remove from FRR1 node 'show ip igmp groups'"
@@ -568,12 +553,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
     result = verify_igmp_groups(
         tgen, dut, intf_l1_i1, IGMP_JOIN_RANGE_1, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "IGMP groups are not deleted \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: IGMP groups should be deleted \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     dut = "f1"
     result = verify_igmp_groups(tgen, dut, intf_f1_i8, IGMP_JOIN_RANGE_1)
@@ -612,12 +596,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroutes are still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     for data in input_dict_l1:
         result = verify_upstream_iif(
@@ -630,9 +613,9 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
         )
         assert result is not True, (
             "Testcase {} : Failed \n "
-            "upstream entries are still present \n Error: {}".format(tc_name, result)
+            "Expected: [{}]: Upstream IIF {} should not be present \n "
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     input_dict_f1 = [
         {
@@ -680,12 +663,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
 
     input_traffic = {"f1": {"traffic_sent": [intf_f1_i8]}}
     result = verify_multicast_traffic(tgen, input_traffic, expected=False)
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " " Traffic is not stopped yet \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: Multicast traffic should be stopped \n "
+        "Found: {}".format(tc_name, "f1", result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step(
         "IGMP groups are remove from FRR1 node 'show ip igmp groups'"
@@ -696,12 +678,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
     result = verify_igmp_groups(
         tgen, dut, intf_f1_i8, IGMP_JOIN_RANGE_1, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "IGMP groups are not deleted \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: IGMP groups should be deleted \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step(
         "(*,G) and (S,G) OIL got prune state (none) from all the nodes"
@@ -735,12 +716,11 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroutes are still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     for data in input_dict_l1:
         result = verify_upstream_iif(
@@ -753,9 +733,9 @@ def test_verify_oil_when_join_prune_sent_scenario_1_p1(request):
         )
         assert result is not True, (
             "Testcase {} : Failed \n "
-            "upstream entries are still present \n Error: {}".format(tc_name, result)
+            "Expected: [{}]: Upstream IIF {} should not be present \n "
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     shutdown_bringup_interface(tgen, "f1", intf_f1_i8, True)
     shutdown_bringup_interface(tgen, "l1", intf_l1_i1, True)
@@ -923,12 +903,11 @@ def test_verify_oil_when_join_prune_sent_scenario_2_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroutes are still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     input_dict_l1_r2 = [
         {
@@ -987,12 +966,11 @@ def test_verify_oil_when_join_prune_sent_scenario_2_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroutes are still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     step("After prune is sent verify upstream got removed in FRR1 node")
 
@@ -1007,9 +985,9 @@ def test_verify_oil_when_join_prune_sent_scenario_2_p1(request):
         )
         assert result is not True, (
             "Testcase {} : Failed \n "
-            "upstream entries are still present \n Error: {}".format(tc_name, result)
+            "Expected: [{}]: Upstream IIF {} should not be present \n "
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     write_test_footer(tc_name)
 
@@ -1146,12 +1124,11 @@ def test_shut_noshut_source_interface_when_upstream_cleared_from_LHR_p1(request)
     result = verify_mroutes(
         tgen, "f1", source_i2, IGMP_JOIN_RANGE_1, intf_f1_i2, intf_f1_r2, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n mroutes are" " still present \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+        "Found: {}".format(tc_name, "f1", result)
     )
-    logger.info("Expected Behavior: {}".format(result))
 
     step(
         "After waiting for (S,G) timeout from FRR1 for same"
@@ -1162,9 +1139,11 @@ def test_shut_noshut_source_interface_when_upstream_cleared_from_LHR_p1(request)
     result = verify_upstream_iif(
         tgen, "l1", "Unknown", source_i2, IGMP_JOIN_RANGE_1, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed Error: \n mroutes are still present".format(tc_name)
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: Upstream IIF should be Unknown \n "
+        "Found: {}".format(tc_name, "l1", result)
+    )
 
     step("No shut the Source interface just after the upstream is expired" " from FRR1")
     shutdown_bringup_interface(tgen, "f1", intf_f1_i2, True)
@@ -1355,9 +1334,11 @@ def test_shut_noshut_receiver_interface_when_upstream_cleared_from_LHR_p1(reques
     result = verify_upstream_iif(
         tgen, "l1", "Unknown", source_i2, IGMP_JOIN_RANGE_1, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed Error: \nmroutes are still present".format(tc_name)
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: Upstream IIF should be Unknown \n "
+        "Found: {}".format(tc_name, "l1", result)
+    )
 
     step("No shut the Source interface just after the upstream is expired" " from FRR1")
     shutdown_bringup_interface(tgen, "l1", intf_l1_i1, True)
@@ -1531,6 +1512,108 @@ def test_verify_remove_add_igmp_config_to_receiver_interface_p0(request):
         )
         assert result is True, "Testcase {} : Failed Error: {}".format(tc_name, result)
 
+    # IGMP JSON verification
+    step("Verify IGMP group and source JSON for single interface and group")
+    router = tgen.gears["l1"]
+
+    reffile = os.path.join(CWD, "igmp_group_all_detail.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp vrf default groups detail json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP group detailed output on l1 for all interfaces and all groups is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_single_if_group_all_brief.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp vrf default groups l1-i1-eth1 json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP group output on l1 for all groups in interface l1-i1-eth1 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_single_if_group_all_detail.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp vrf default groups l1-i1-eth1 detail json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP group detailed output on l1 for all groups in interface l1-i1-eth1 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_single_if_single_group_brief.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp vrf default groups l1-i1-eth1 225.1.1.5 json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP group output on l1 for interface l1-i1-eth1 and group 225.1.1.5 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_single_if_single_group_detail.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp vrf default groups l1-i1-eth1 225.1.1.5 detail json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP group detailed output on l1 for interface l1-i1-eth1 and group 225.1.1.5 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_source_single_if_group_all.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp sources l1-i1-eth1 json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP source output on l1 for interface l1-i1-eth1 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
+    reffile = os.path.join(CWD, "igmp_source_single_if_single_group.json")
+    expected = json.loads(open(reffile).read())
+    test_func = functools.partial(
+        topotest.router_json_cmp,
+        router,
+        "show ip igmp sources l1-i1-eth1 225.1.1.4 json",
+        expected,
+    )
+    _, res = topotest.run_and_expect(test_func, None, count=60, wait=2)
+    assertmsg = "IGMP source output on l1 for interface l1-i1-eth1 and group 225.1.1.4 is not as expected. Expected: {}".format(
+        expected
+    )
+    assert res is None, assertmsg
+
     step(
         "Remove igmp 'no ip igmp' and 'no ip igmp version 2' from"
         " receiver interface of FRR1"
@@ -1559,12 +1642,11 @@ def test_verify_remove_add_igmp_config_to_receiver_interface_p0(request):
     dut = "l1"
     interface = topo["routers"]["l1"]["links"]["i1"]["interface"]
     result = verify_igmp_groups(tgen, dut, interface, IGMP_JOIN_RANGE_1, expected=False)
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n Groups are not" " present \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: IGMP groups should not be present \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     intf_l1_r2 = topo["routers"]["l1"]["links"]["r2"]["interface"]
     intf_l1_i1 = topo["routers"]["l1"]["links"]["i1"]["interface"]
@@ -1658,12 +1740,11 @@ def test_verify_remove_add_igmp_config_to_receiver_interface_p0(request):
     dut = "l1"
     interface = topo["routers"]["l1"]["links"]["i1"]["interface"]
     result = verify_igmp_groups(tgen, dut, interface, IGMP_JOIN_RANGE_1, expected=False)
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n Groups are not" " present \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: IGMP groups should not be present \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     result = verify_multicast_traffic(tgen, input_traffic)
     assert result is True, "Testcase {}: Failed Error: {}".format(tc_name, result)
@@ -1780,12 +1861,11 @@ def test_verify_remove_add_igmp_config_to_receiver_interface_p0(request):
     result = verify_mroutes(
         tgen, dut, source, IGMP_JOIN_RANGE_1, iif, oil, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n routes are still" " present \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     write_test_footer(tc_name)
 
@@ -1965,12 +2045,11 @@ def test_verify_remove_add_igmp_commands_when_pim_configured_p0(request):
     )
 
     result = verify_igmp_config(tgen, input_dict_1, expected=False)
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "IGMP interface is not removed \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: IGMP interface should be removed \n "
+        "Found: {}".format(tc_name, data["dut"], result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step("Verify that no core is observed")
     if tgen.routers_have_failure():
@@ -2852,12 +2931,11 @@ def test_mroute_after_removing_RP_sending_IGMP_prune_p2(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroute still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     for data in input_dict_sg:
         result = verify_mroutes(
@@ -2889,9 +2967,9 @@ def test_mroute_after_removing_RP_sending_IGMP_prune_p2(request):
     )
     assert result is not True, (
         "Testcase {} : Failed \n "
-        "IGMP groups still present  still present \n Error: {}".format(tc_name, result)
+        "Expected: [{}]: IGMP groups should not present \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step(
         "After receiving the IGMP prune from FRR1 , verify traffic "
@@ -3183,12 +3261,11 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "mroute still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     for data in input_dict_sg_i1:
         result = verify_mroutes(
@@ -3212,12 +3289,11 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
             IGMP_JOIN_RANGE_1,
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n " "upstream still present \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: Upstream IIF interface {} should not be present\n"
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     for data in input_dict_sg_i1:
         result = verify_upstream_iif(
@@ -3237,12 +3313,11 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
     result = verify_pim_rp_info(
         tgen, topo, dut, GROUP_RANGE_1, "Unknown", rp_address, SOURCE, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "RP iif is not updated \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: RP IIF should be updated as Unknown \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step("Verify mroute  after No shut the link from LHR to RP from RP node")
 
@@ -3369,8 +3444,9 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
         )
         assert result is not True, (
             "Testcase {} : Failed \n "
-            "upstream is still present after shut the link from "
-            "FHR to RP from RP node \n Error: {}".format(tc_name, result)
+            "Expected: [{}]: Upstream IIF interface {} should not be present"
+            " after shutting link from RP to FHR \n"
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
 
     step(" No shut the link from FHR to RP from RP node")
@@ -3386,12 +3462,11 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
     result = verify_pim_rp_info(
         tgen, topo, dut, GROUP_RANGE_1, "Unknown", rp_address, SOURCE, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "RP iif is not updated \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: RP IIF should be updated as Unknown \n"
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step("Verify mroute after Noshut the link from FHR to RP from RP node")
 
@@ -3518,8 +3593,9 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
         )
         assert result is not True, (
             "Testcase {} : Failed \n "
-            "upstream is still present after shut the link from "
-            "FHR to RP from FHR node \n Error: {}".format(tc_name, result)
+            "Expected: [{}]: Upstream IIF interface {} should not be present"
+            " after shutting link from FHR to RP \n"
+            "Found: {}".format(tc_name, data["dut"], data["iif"], result)
         )
 
     step(" No shut the link from FHR to RP from FHR node")
@@ -3534,12 +3610,11 @@ def test_prune_sent_to_LHR_and_FHR_when_PIMnbr_down_p2(request):
     result = verify_pim_rp_info(
         tgen, topo, dut, GROUP_RANGE_1, "Unknown", rp_address, SOURCE, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n " "RP iif is not updated \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: RP IIF should be updated as Unknown \n"
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     step("Verify mroute after No Shut the link from FHR to RP from FHR node")
 
@@ -3969,12 +4044,10 @@ def test_verify_multicast_traffic_when_LHR_connected_to_RP_p1(request):
             expected=False,
         )
         assert result is not True, (
-            "Testcase {} : Failed \n"
-            " Expected Behaviour: mroutes are cleared \n Error: {}".format(
-                tc_name, result
-            )
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     shutdown_bringup_interface(tgen, "r2", intf_r2_i3, True)
 
@@ -4038,12 +4111,11 @@ def test_verify_multicast_traffic_when_LHR_connected_to_RP_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n" "mroutes are cleared \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     shutdown_bringup_interface(tgen, "l1", intf_l1_i1, True)
 
@@ -4113,12 +4185,11 @@ def test_verify_multicast_traffic_when_LHR_connected_to_RP_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n" " mroutes are cleared \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     shutdown_bringup_interface(tgen, "r2", intf_r2_f1, True)
 
@@ -4181,12 +4252,11 @@ def test_verify_multicast_traffic_when_LHR_connected_to_RP_p1(request):
     result = verify_mroutes(
         tgen, dut, src_address, _IGMP_JOIN_RANGE, iif, oil, expected=False
     )
-    assert (
-        result is not True
-    ), "Testcase {} : Failed \n" " mroutes are cleared \n Error: {}".format(
-        tc_name, result
+    assert result is not True, (
+        "Testcase {} : Failed \n "
+        "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+        "Found: {}".format(tc_name, dut, result)
     )
-    logger.info("Expected Behaviour: {}".format(result))
 
     shutdown_bringup_interface(tgen, "l1", intf_l1_r2, True)
 
@@ -4383,12 +4453,11 @@ def test_verify_multicast_traffic_when_FHR_connected_to_RP_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n" " mroutes are cleared \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     step("No shut the receiver(l1) port in 1 min interval")
 
@@ -4449,12 +4518,11 @@ def test_verify_multicast_traffic_when_FHR_connected_to_RP_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n" " mroutes are cleared \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     step("No shut the source(r2) port in 1 min interval")
 
@@ -4521,12 +4589,11 @@ def test_verify_multicast_traffic_when_FHR_connected_to_RP_p1(request):
             data["oil"],
             expected=False,
         )
-        assert (
-            result is not True
-        ), "Testcase {} : Failed \n" " mroutes are cleared \n Error: {}".format(
-            tc_name, result
+        assert result is not True, (
+            "Testcase {} : Failed \n "
+            "Expected: [{}]: mroute (S, G) should not be present in mroute table \n "
+            "Found: {}".format(tc_name, data["dut"], result)
         )
-        logger.info("Expected Behaviour: {}".format(result))
 
     write_test_footer(tc_name)
 

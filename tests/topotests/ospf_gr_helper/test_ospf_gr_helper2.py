@@ -1,23 +1,10 @@
 #!/usr/bin/python
+# SPDX-License-Identifier: ISC
 
 #
 # Copyright (c) 2021 by VMware, Inc. ("VMware")
 # Used Copyright (c) 2018 by Network Device Education Foundation, Inc.
 # ("NetDEF") in this file.
-#
-# Permission to use, copy, modify, and/or distribute this software
-# for any purpose with or without fee is hereby granted, provided
-# that the above copyright notice and this permission notice appear
-# in all copies.
-#
-# THE SOFTWARE IS PROVIDED "AS IS" AND VMWARE DISCLAIMS ALL WARRANTIES
-# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL VMWARE BE LIABLE FOR
-# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
-# DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
-# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
-# ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
-# OF THIS SOFTWARE.
 #
 
 
@@ -43,7 +30,6 @@ from lib.common_config import (
     reset_config_on_routers,
     step,
     create_interfaces_cfg,
-    topo_daemons,
     scapy_send_raw_packet,
 )
 
@@ -121,12 +107,9 @@ def setup_module(mod):
     topo = tgen.json_topo
     # ... and here it calls Mininet initialization functions.
 
-    # get list of daemons needs to be started for this suite.
-    daemons = topo_daemons(tgen, topo)
-
     # Starting topology, create tmp files which are loaded to routers
     #  to start daemons and then start routers
-    start_topology(tgen, daemons)
+    start_topology(tgen)
 
     # Creating configuration from JSON
     build_config_from_json(tgen, topo)
@@ -136,7 +119,7 @@ def setup_module(mod):
         pytest.skip(tgen.errors)
 
     ospf_covergence = verify_ospf_neighbor(tgen, topo, lan=True)
-    assert ospf_covergence is True, "setup_module :Failed \n Error:" " {}".format(
+    assert ospf_covergence is True, "setup_module :Failed \n Error:  {}".format(
         ospf_covergence
     )
 
@@ -157,7 +140,7 @@ def teardown_module():
 
     try:
         # Stop toplogy and Remove tmp files
-        tgen.stop_topology
+        tgen.stop_topology()
 
     except OSError:
         # OSError exception is raised when mininet tries to stop switch
@@ -205,10 +188,10 @@ def test_ospf_gr_helper_tc3_p1(request):
     ospf_covergence = verify_ospf_neighbor(tgen, topo, lan=True)
     assert (
         ospf_covergence is True
-    ), "OSPF is not after reset config \n Error:" " {}".format(ospf_covergence)
-    step(
-        "Configure DR pririty 100 on R0 and clear ospf neighbors " "on all the routers."
-    )
+    ), "OSPF is not after reset config \n Error:  {}".format(ospf_covergence)
+
+    step("Configure DR priority 100 on R0 and clear ospf neighbors "
+         "on all the routers.")
 
     input_dict = {
         "r0": {
@@ -233,9 +216,9 @@ def test_ospf_gr_helper_tc3_p1(request):
         "r0": {
             "ospf": {
                 "neighbors": {
-                    "r1": {"state": "Full", "role": "Backup"},
-                    "r2": {"state": "Full", "role": "DROther"},
-                    "r3": {"state": "Full", "role": "DROther"},
+                    "r1": {"nbrState": "Full", "role": "Backup"},
+                    "r2": {"nbrState": "Full", "role": "DROther"},
+                    "r3": {"nbrState": "Full", "role": "DROther"},
                 }
             }
         }
@@ -299,10 +282,8 @@ def test_ospf_gr_helper_tc4_p1(request):
     ospf_covergence = verify_ospf_neighbor(tgen, topo, lan=True)
     assert (
         ospf_covergence is True
-    ), "OSPF is not after reset config \n Error:" " {}".format(ospf_covergence)
-    step(
-        "Configure DR pririty 100 on R0 and clear ospf neighbors " "on all the routers."
-    )
+    ), "OSPF is not after reset config \n Error:  {}".format(ospf_covergence)
+    step("Configure DR priority 0 on R0 and clear ospf neighbors  on all the routers.")
 
     input_dict = {
         "r0": {
@@ -327,9 +308,9 @@ def test_ospf_gr_helper_tc4_p1(request):
         "r0": {
             "ospf": {
                 "neighbors": {
-                    "r1": {"state": "Full", "role": "DR"},
-                    "r2": {"state": "2-Way", "role": "DROther"},
-                    "r3": {"state": "2-Way", "role": "DROther"},
+                    "r1": {"nbrState": "Full", "role": "DR"},
+                    "r2": {"nbrState": "2-Way", "role": "DROther"},
+                    "r3": {"nbrState": "2-Way", "role": "DROther"},
                 }
             }
         }

@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* BGP-4 dump routine
  * Copyright (C) 1999 Kunihiro Ishiguro
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
@@ -25,7 +10,7 @@
 #include "sockunion.h"
 #include "command.h"
 #include "prefix.h"
-#include "thread.h"
+#include "frrevent.h"
 #include "linklist.h"
 #include "queue.h"
 #include "memory.h"
@@ -84,11 +69,11 @@ struct bgp_dump {
 
 	char *interval_str;
 
-	struct thread *t_interval;
+	struct event *t_interval;
 };
 
 static int bgp_dump_unset(struct bgp_dump *bgp_dump);
-static void bgp_dump_interval_func(struct thread *);
+static void bgp_dump_interval_func(struct event *);
 
 /* BGP packet dump output buffer. */
 struct stream *bgp_dump_obuf;
@@ -117,9 +102,13 @@ static FILE *bgp_dump_open_file(struct bgp_dump *bgp_dump)
 	if (bgp_dump->filename[0] != DIRECTORY_SEP) {
 		snprintf(fullpath, sizeof(fullpath), "%s/%s", vty_get_cwd(),
 			 bgp_dump->filename);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+		/* user supplied date/time format string */
 		ret = strftime(realpath, MAXPATHLEN, fullpath, &tm);
 	} else
 		ret = strftime(realpath, MAXPATHLEN, bgp_dump->filename, &tm);
+#pragma GCC diagnostic pop
 
 	if (ret == 0) {
 		flog_warn(EC_BGP_DUMP, "%s: strftime error", __func__);
@@ -165,13 +154,13 @@ static int bgp_dump_interval_add(struct bgp_dump *bgp_dump, int interval)
 			interval = interval
 				   - secs_into_day % interval; /* always > 0 */
 		}
-		thread_add_timer(bm->master, bgp_dump_interval_func, bgp_dump,
-				 interval, &bgp_dump->t_interval);
+		event_add_timer(bm->master, bgp_dump_interval_func, bgp_dump,
+				interval, &bgp_dump->t_interval);
 	} else {
 		/* One-off dump: execute immediately, don't affect any scheduled
 		 * dumps */
-		thread_add_event(bm->master, bgp_dump_interval_func, bgp_dump,
-				 0, &bgp_dump->t_interval);
+		event_add_event(bm->master, bgp_dump_interval_func, bgp_dump, 0,
+				&bgp_dump->t_interval);
 	}
 
 	return 0;
@@ -376,7 +365,7 @@ bgp_dump_route_node_record(int afi, struct bgp_dest *dest,
 
 		/* Dump attribute. */
 		/* Skip prefix & AFI/SAFI for MP_NLRI */
-		bgp_dump_routes_attr(obuf, path->attr, p);
+		bgp_dump_routes_attr(obuf, path, p);
 
 		cur_endp = stream_get_endp(obuf);
 		if (cur_endp > BGP_STANDARD_MESSAGE_MAX_PACKET_SIZE
@@ -439,10 +428,10 @@ static unsigned int bgp_dump_routes_func(int afi, int first_run,
 	return seq;
 }
 
-static void bgp_dump_interval_func(struct thread *t)
+static void bgp_dump_interval_func(struct event *t)
 {
 	struct bgp_dump *bgp_dump;
-	bgp_dump = THREAD_ARG(t);
+	bgp_dump = EVENT_ARG(t);
 
 	/* Reschedule dump even if file couldn't be opened this time... */
 	if (bgp_dump_open_file(bgp_dump) != NULL) {
@@ -702,7 +691,7 @@ static int bgp_dump_unset(struct bgp_dump *bgp_dump)
 	}
 
 	/* Removing interval event. */
-	THREAD_OFF(bgp_dump->t_interval);
+	EVENT_OFF(bgp_dump->t_interval);
 
 	bgp_dump->interval = 0;
 
@@ -856,8 +845,7 @@ void bgp_dump_init(void)
 	memset(&bgp_dump_routes, 0, sizeof(bgp_dump_routes));
 
 	bgp_dump_obuf =
-		stream_new((BGP_STANDARD_MESSAGE_MAX_PACKET_SIZE * 2)
-			   + BGP_DUMP_MSG_HEADER + BGP_DUMP_HEADER_SIZE);
+		stream_new(BGP_MAX_PACKET_SIZE + BGP_MAX_PACKET_SIZE_OVERFLOW);
 
 	install_node(&bgp_dump_node);
 

@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2003 Yasuhiro Ohara
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
@@ -27,7 +12,7 @@
 #include "vty.h"
 #include "command.h"
 #include "memory.h"
-#include "thread.h"
+#include "frrevent.h"
 #include "checksum.h"
 #include "frrstr.h"
 
@@ -46,9 +31,7 @@
 #include "ospf6_flood.h"
 #include "ospf6d.h"
 
-#ifndef VTYSH_EXTRACT_PL
 #include "ospf6d/ospf6_lsa_clippy.c"
-#endif
 
 DEFINE_MTYPE_STATIC(OSPF6D, OSPF6_LSA,         "OSPF6 LSA");
 DEFINE_MTYPE_STATIC(OSPF6D, OSPF6_LSA_HEADER,  "OSPF6 LSA header");
@@ -85,11 +68,7 @@ static int ospf6_unknown_lsa_show(struct vty *vty, struct ospf6_lsa *lsa,
 	start = (uint8_t *)lsa->header + sizeof(struct ospf6_lsa_header);
 	end = (uint8_t *)lsa->header + ntohs(lsa->header->length);
 
-#if CONFDATE > 20230131
-CPP_NOTICE("Remove JSON object commands with keys starting with capital")
-#endif
 	if (use_json) {
-		json_object_string_add(json_obj, "LsaType", "unknown");
 		json_object_string_add(json_obj, "lsaType", "unknown");
 	} else {
 		vty_out(vty, "        Unknown contents:\n");
@@ -323,8 +302,8 @@ void ospf6_lsa_premature_aging(struct ospf6_lsa *lsa)
 	if (IS_OSPF6_DEBUG_LSA_TYPE(lsa->header->type))
 		zlog_debug("LSA: Premature aging: %s", lsa->name);
 
-	THREAD_OFF(lsa->expire);
-	THREAD_OFF(lsa->refresh);
+	EVENT_OFF(lsa->expire);
+	EVENT_OFF(lsa->refresh);
 
 	/*
 	 * We clear the LSA from the neighbor retx lists now because it
@@ -354,7 +333,7 @@ void ospf6_lsa_premature_aging(struct ospf6_lsa *lsa)
 	ospf6_flood_clear(lsa);
 
 	lsa->header->age = htons(OSPF_LSA_MAXAGE);
-	thread_execute(master, ospf6_lsa_expire, lsa, 0);
+	event_execute(master, ospf6_lsa_expire, lsa, 0);
 }
 
 /* check which is more recent. if a is more recent, return -1;
@@ -575,7 +554,7 @@ void ospf6_lsa_show_dump(struct vty *vty, struct ospf6_lsa *lsa,
 		json = json_object_new_object();
 		size_t header_str_sz = (2 * (end - start)) + 1;
 
-		header_str = XMALLOC(MTYPE_TMP, header_str_sz);
+		header_str = XMALLOC(MTYPE_OSPF6_LSA_HEADER, header_str_sz);
 
 		inet_ntop(AF_INET, &lsa->header->id, id, sizeof(id));
 		inet_ntop(AF_INET, &lsa->header->adv_router, adv_router,
@@ -588,7 +567,7 @@ void ospf6_lsa_show_dump(struct vty *vty, struct ospf6_lsa *lsa,
 		json_object_string_add(json, "header", header_str);
 		json_object_array_add(json_array, json);
 
-		XFREE(MTYPE_TMP, header_str);
+		XFREE(MTYPE_OSPF6_LSA_HEADER, header_str);
 	} else {
 		vty_out(vty, "\n%s:\n", lsa->name);
 
@@ -781,8 +760,8 @@ void ospf6_lsa_delete(struct ospf6_lsa *lsa)
 	assert(lsa->lock == 0);
 
 	/* cancel threads */
-	THREAD_OFF(lsa->expire);
-	THREAD_OFF(lsa->refresh);
+	EVENT_OFF(lsa->expire);
+	EVENT_OFF(lsa->refresh);
 
 	/* do free */
 	XFREE(MTYPE_OSPF6_LSA_HEADER, lsa->header);
@@ -833,18 +812,18 @@ struct ospf6_lsa *ospf6_lsa_unlock(struct ospf6_lsa *lsa)
 
 
 /* ospf6 lsa expiry */
-void ospf6_lsa_expire(struct thread *thread)
+void ospf6_lsa_expire(struct event *thread)
 {
 	struct ospf6_lsa *lsa;
 	struct ospf6 *ospf6;
 
-	lsa = (struct ospf6_lsa *)THREAD_ARG(thread);
+	lsa = (struct ospf6_lsa *)EVENT_ARG(thread);
 
 	assert(lsa && lsa->header);
 	assert(OSPF6_LSA_IS_MAXAGE(lsa));
 	assert(!lsa->refresh);
 
-	lsa->expire = (struct thread *)NULL;
+	lsa->expire = (struct event *)NULL;
 
 	if (IS_OSPF6_DEBUG_LSA_TYPE(lsa->header->type)) {
 		zlog_debug("LSA Expire:");
@@ -866,15 +845,15 @@ void ospf6_lsa_expire(struct thread *thread)
 	ospf6_maxage_remove(ospf6);
 }
 
-void ospf6_lsa_refresh(struct thread *thread)
+void ospf6_lsa_refresh(struct event *thread)
 {
 	struct ospf6_lsa *old, *self, *new;
 	struct ospf6_lsdb *lsdb_self;
 
-	old = (struct ospf6_lsa *)THREAD_ARG(thread);
+	old = (struct ospf6_lsa *)EVENT_ARG(thread);
 	assert(old && old->header);
 
-	old->refresh = (struct thread *)NULL;
+	old->refresh = (struct event *)NULL;
 
 	lsdb_self = ospf6_get_scoped_lsdb_self(old);
 	self = ospf6_lsdb_lookup(old->header->type, old->header->id,
@@ -896,8 +875,8 @@ void ospf6_lsa_refresh(struct thread *thread)
 
 	new = ospf6_lsa_create(self->header);
 	new->lsdb = old->lsdb;
-	thread_add_timer(master, ospf6_lsa_refresh, new, OSPF_LS_REFRESH_TIME,
-			 &new->refresh);
+	event_add_timer(master, ospf6_lsa_refresh, new, OSPF_LS_REFRESH_TIME,
+			&new->refresh);
 
 	/* store it in the LSDB for self-originated LSAs */
 	ospf6_lsdb_add(ospf6_lsa_copy(new), lsdb_self);

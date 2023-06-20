@@ -50,7 +50,7 @@
     ],
     "edges":[
       {
-        "edge-id":1,
+        "edge-id":"2001:db8::1",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0001",
@@ -61,32 +61,32 @@
           "te-metric":20,
           "local-address-v6":"2001:db8::1",
           "remote-address-v6":"2001:db8::2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":99999997952,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ],
           "delay":10000,
@@ -94,7 +94,7 @@
         }
       },
       {
-        "edge-id":2,
+        "edge-id":"2001:db8::2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -103,38 +103,38 @@
         "metric":10,
         "edge-attributes":{
           "local-address-v6":"2001:db8::2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":65537,
+        "edge-id":"2001:db8:1::1:1",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0001",
@@ -144,38 +144,38 @@
         "edge-attributes":{
           "local-address-v6":"2001:db8:1::1:1",
           "remote-address-v6":"2001:db8:1::1:2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":65538,
+        "edge-id":"2001:db8:1::1:2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -185,38 +185,38 @@
         "edge-attributes":{
           "local-address-v6":"2001:db8:1::1:2",
           "remote-address-v6":"2001:db8:1::1:1",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":196610,
+        "edge-id":"2001:db8:3::3:2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -226,38 +226,38 @@
         "edge-attributes":{
           "local-address-v6":"2001:db8:3::3:2",
           "remote-address-v6":"2001:db8:3::3:3",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":196611,
+        "edge-id":"2001:db8:3::3:3",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0003",
@@ -268,38 +268,38 @@
           "admin-group":32,
           "local-address-v6":"2001:db8:3::3:3",
           "remote-address-v6":"2001:db8:3::3:2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":196612,
+        "edge-id":"2001:db8:5::3:4",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0004",
@@ -309,32 +309,32 @@
         "edge-attributes":{
           "local-address-v6":"2001:db8:5::3:4",
           "remote-address-v6":"2001:db8:5::4:3",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         },
@@ -347,7 +347,7 @@
         ]
       },
       {
-        "edge-id":262147,
+        "edge-id":"2001:db8:5::4:3",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0003",
@@ -358,39 +358,39 @@
           "te-metric":10,
           "local-address-v6":"2001:db8:5::4:3",
           "remote-address-v6":"2001:db8:5::3:4",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ],
           "delay":50000
         }
       },
       {
-        "edge-id":167772161,
+        "edge-id":"10.0.0.1",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0001",
@@ -401,32 +401,32 @@
           "te-metric":20,
           "local-address":"10.0.0.1",
           "remote-address":"10.0.0.2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":99999997952,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ],
           "delay":10000,
@@ -434,7 +434,7 @@
         }
       },
       {
-        "edge-id":167772162,
+        "edge-id":"10.0.0.2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -444,38 +444,38 @@
         "edge-attributes":{
           "local-address":"10.0.0.2",
           "remote-address":"10.0.0.1",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":167772417,
+        "edge-id":"10.0.1.1",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0001",
@@ -485,38 +485,38 @@
         "edge-attributes":{
           "local-address":"10.0.1.1",
           "remote-address":"10.0.1.2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":167772418,
+        "edge-id":"10.0.1.2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -526,38 +526,38 @@
         "edge-attributes":{
           "local-address":"10.0.1.2",
           "remote-address":"10.0.1.1",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":167772930,
+        "edge-id":"10.0.3.2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -567,38 +567,38 @@
         "edge-attributes":{
           "local-address":"10.0.3.2",
           "remote-address":"10.0.3.3",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":167772931,
+        "edge-id":"10.0.3.3",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0003",
@@ -609,38 +609,38 @@
           "admin-group":32,
           "local-address":"10.0.3.3",
           "remote-address":"10.0.3.2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ]
         }
       },
       {
-        "edge-id":167773186,
+        "edge-id":"10.0.4.2",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0002",
@@ -651,39 +651,39 @@
           "te-metric":30,
           "local-address":"10.0.4.2",
           "remote-address":"10.0.4.4",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":99999997952,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ],
           "delay":25000
         }
       },
       {
-        "edge-id":167773188,
+        "edge-id":"10.0.4.4",
         "status":"Sync",
         "origin":"ISIS_L2",
         "advertised-router":"0000.0000.0004",
@@ -693,32 +693,32 @@
         "edge-attributes":{
           "local-address":"10.0.4.4",
           "remote-address":"10.0.4.2",
-          "max-link-bandwidth":176258176.0,
-          "max-resv-link-bandwidth":176258176.0,
+          "max-link-bandwidth":1250000,
+          "max-resv-link-bandwidth":1250000,
           "unreserved-bandwidth":[
             {
-              "class-type-0":176258176.0
+              "class-type-0":1250000
             },
             {
-              "class-type-1":176258176.0
+              "class-type-1":1250000
             },
             {
-              "class-type-2":176258176.0
+              "class-type-2":1250000
             },
             {
-              "class-type-3":176258176.0
+              "class-type-3":1250000
             },
             {
-              "class-type-4":176258176.0
+              "class-type-4":1250000
             },
             {
-              "class-type-5":176258176.0
+              "class-type-5":1250000
             },
             {
-              "class-type-6":176258176.0
+              "class-type-6":1250000
             },
             {
-              "class-type-7":176258176.0
+              "class-type-7":1250000
             }
           ],
           "delay":20000,

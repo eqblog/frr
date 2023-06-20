@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /* MPLS-VPN
  * Copyright (C) 2000 Kunihiro Ishiguro <kunihiro@zebra.org>
  *
  * This file is part of GxNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef _QUAGGA_BGP_MPLSVPN_H
@@ -44,6 +31,7 @@
 #define BGP_PREFIX_SID_SRV6_MAX_FUNCTION_LENGTH 20
 
 extern void bgp_mplsvpn_init(void);
+extern void bgp_mplsvpn_path_nh_label_unlink(struct bgp_path_info *pi);
 extern int bgp_nlri_parse_vpn(struct peer *, struct attr *, struct bgp_nlri *);
 extern uint32_t decode_label(mpls_label_t *);
 extern void encode_label(mpls_label_t, mpls_label_t *);
@@ -75,15 +63,25 @@ extern bool vpn_leak_to_vrf_update(struct bgp *from_bgp,
 				   struct bgp_path_info *path_vpn,
 				   struct prefix_rd *prd);
 
-extern void vpn_leak_to_vrf_withdraw(struct bgp *from_bgp,
-				     struct bgp_path_info *path_vpn);
+extern void vpn_leak_to_vrf_withdraw(struct bgp_path_info *path_vpn);
 
 extern void vpn_leak_zebra_vrf_label_update(struct bgp *bgp, afi_t afi);
 extern void vpn_leak_zebra_vrf_label_withdraw(struct bgp *bgp, afi_t afi);
 extern void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi);
+extern void vpn_leak_zebra_vrf_sid_update_per_af(struct bgp *bgp, afi_t afi);
+extern void vpn_leak_zebra_vrf_sid_update_per_vrf(struct bgp *bgp);
 extern void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi);
+extern void vpn_leak_zebra_vrf_sid_withdraw_per_af(struct bgp *bgp, afi_t afi);
+extern void vpn_leak_zebra_vrf_sid_withdraw_per_vrf(struct bgp *bgp);
 extern int vpn_leak_label_callback(mpls_label_t label, void *lblid, bool alloc);
 extern void ensure_vrf_tovpn_sid(struct bgp *vpn, struct bgp *vrf, afi_t afi);
+extern void delete_vrf_tovpn_sid(struct bgp *vpn, struct bgp *vrf, afi_t afi);
+extern void delete_vrf_tovpn_sid_per_af(struct bgp *vpn, struct bgp *vrf,
+					afi_t afi);
+extern void delete_vrf_tovpn_sid_per_vrf(struct bgp *vpn, struct bgp *vrf);
+extern void ensure_vrf_tovpn_sid_per_af(struct bgp *vpn, struct bgp *vrf,
+					afi_t afi);
+extern void ensure_vrf_tovpn_sid_per_vrf(struct bgp *vpn, struct bgp *vrf);
 extern void transpose_sid(struct in6_addr *sid, uint32_t label, uint8_t offset,
 			  uint8_t size);
 extern void vrf_import_from_vrf(struct bgp *to_bgp, struct bgp *from_bgp,
@@ -251,17 +249,33 @@ static inline void vpn_leak_postchange(enum vpn_policy_direction direction,
 			vpn_leak_zebra_vrf_label_update(bgp_vrf, afi);
 		}
 
-		if (!bgp_vrf->vpn_policy[afi].tovpn_sid)
+		if (bgp_vrf->vpn_policy[afi].tovpn_sid_index == 0 &&
+		    !CHECK_FLAG(bgp_vrf->vpn_policy[afi].flags,
+				BGP_VPN_POLICY_TOVPN_SID_AUTO) &&
+		    bgp_vrf->tovpn_sid_index == 0 &&
+		    !CHECK_FLAG(bgp_vrf->vrf_flags, BGP_VRF_TOVPN_SID_AUTO))
+			delete_vrf_tovpn_sid(bgp_vpn, bgp_vrf, afi);
+
+		if (!bgp_vrf->vpn_policy[afi].tovpn_sid && !bgp_vrf->tovpn_sid)
 			ensure_vrf_tovpn_sid(bgp_vpn, bgp_vrf, afi);
 
-		if (!bgp_vrf->vpn_policy[afi].tovpn_sid
-		    && bgp_vrf->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent)
+		if ((!bgp_vrf->vpn_policy[afi].tovpn_sid &&
+		     bgp_vrf->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent) ||
+		    (!bgp_vrf->tovpn_sid &&
+		     bgp_vrf->tovpn_zebra_vrf_sid_last_sent))
 			vpn_leak_zebra_vrf_sid_withdraw(bgp_vrf, afi);
 
-		if (sid_diff(bgp_vrf->vpn_policy[afi].tovpn_sid,
-			     bgp_vrf->vpn_policy[afi]
-				     .tovpn_zebra_vrf_sid_last_sent)) {
-			vpn_leak_zebra_vrf_sid_update(bgp_vrf, afi);
+		if (bgp_vrf->vpn_policy[afi].tovpn_sid) {
+			if (sid_diff(bgp_vrf->vpn_policy[afi].tovpn_sid,
+				     bgp_vrf->vpn_policy[afi]
+					     .tovpn_zebra_vrf_sid_last_sent)) {
+				vpn_leak_zebra_vrf_sid_update(bgp_vrf, afi);
+			}
+		} else if (bgp_vrf->tovpn_sid) {
+			if (sid_diff(bgp_vrf->tovpn_sid,
+				     bgp_vrf->tovpn_zebra_vrf_sid_last_sent)) {
+				vpn_leak_zebra_vrf_sid_update(bgp_vrf, afi);
+			}
 		}
 
 		vpn_leak_from_vrf_update_all(bgp_vpn, bgp_vrf, afi);

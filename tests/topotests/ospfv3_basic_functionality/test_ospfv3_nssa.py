@@ -7,7 +7,6 @@ from lib.common_config import (
     write_test_footer,
     reset_config_on_routers,
     step,
-    topo_daemons,
 )
 from lib.topolog import logger
 from lib.topojson import build_config_from_json
@@ -62,12 +61,9 @@ def setup_module(mod):
     topo = tgen.json_topo
     # ... and here it calls Mininet initialization functions.
 
-    # get list of daemons needs to be started for this suite.
-    daemons = topo_daemons(tgen, topo)
-
     # Starting topology, create tmp files which are loaded to routers
     #  to start daemons and then start routers
-    start_topology(tgen, daemons)
+    start_topology(tgen)
 
     # Creating configuration from JSON
     build_config_from_json(tgen, topo)
@@ -77,7 +73,7 @@ def setup_module(mod):
         pytest.skip(tgen.errors)
 
     result = verify_ospf6_neighbor(tgen, topo)
-    assert result is True, "setup_module: Failed \n Error:" " {}".format(result)
+    assert result is True, "setup_module: Failed \n Error:  {}".format(result)
 
     logger.info("Running setup_module() done")
 

@@ -1,23 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * bfd.h: BFD definitions and structures
  *
  * @copyright Copyright (C) 2015 Cumulus Networks, Inc.
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #ifndef _ZEBRA_BFD_H
@@ -222,6 +207,18 @@ void bfd_sess_set_timers(struct bfd_session_params *bsp,
 			 uint32_t min_tx);
 
 /**
+ * Configures the automatic source selection for the BFD session.
+ *
+ * NOTE:
+ * Setting this configuration will override the IP source value set by
+ * `bfd_sess_set_ipv4_addrs` or `bfd_sess_set_ipv6_addrs`.
+ *
+ * \param bsp BFD session parameters
+ * \param enable BFD automatic source selection state.
+ */
+void bfd_sess_set_auto_source(struct bfd_session_params *bsp, bool enable);
+
+/**
  * Installs or updates the BFD session based on the saved session arguments.
  *
  * NOTE:
@@ -331,6 +328,11 @@ void bfd_sess_timers(const struct bfd_session_params *bsp,
 		     uint32_t *min_tx);
 
 /**
+ * Gets the automatic source selection state.
+ */
+bool bfd_sess_auto_source(const struct bfd_session_params *bsp);
+
+/**
  * Show BFD session configuration and status. If `json` is provided (e.g. not
  * `NULL`) then information will be inserted in object, otherwise printed to
  * `vty`.
@@ -346,7 +348,7 @@ void bfd_sess_show(struct vty *vty, struct json_object *json,
  * Initializes the BFD integration library. This function executes the
  * following actions:
  *
- * - Copy the `struct thread_master` pointer to use as "thread" to execute
+ * - Copy the `struct event_loop` pointer to use as "thread" to execute
  *   the BFD session parameters installation.
  * - Copy the `struct zclient` pointer to install its callbacks.
  * - Initializes internal data structures.
@@ -354,8 +356,7 @@ void bfd_sess_show(struct vty *vty, struct json_object *json,
  * \param tm normally the daemon main thread event manager.
  * \param zc the zebra client of the daemon.
  */
-void bfd_protocol_integration_init(struct zclient *zc,
-				   struct thread_master *tm);
+void bfd_protocol_integration_init(struct zclient *zc, struct event_loop *tm);
 
 /**
  * BFD session registration arguments.
@@ -455,6 +456,13 @@ extern bool bfd_protocol_integration_debug(void);
  * Get API shutdown state.
  */
 extern bool bfd_protocol_integration_shutting_down(void);
+
+/* Update nexthop-tracking (nht) information for BFD auto source selection.
+ * The function must be called from the daemon callback function
+ * that deals with the ZEBRA_NEXTHOP_UPDATE zclient command
+ */
+extern int bfd_nht_update(const struct prefix *match,
+			  const struct zapi_route *route);
 
 #ifdef __cplusplus
 }

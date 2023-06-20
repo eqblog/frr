@@ -10,6 +10,7 @@ the following RFCs:
 
 * :rfc:`5880`
 * :rfc:`5881`
+* :rfc:`5882`
 * :rfc:`5883`
 
 Currently, there are two implementations of the BFD commands in FRR:
@@ -352,6 +353,81 @@ The following commands are available inside the interface configuration node.
    Optionally uses the BFD profile ``BFDPROF`` in the created sessions under
    that interface.
 
+
+.. _bfd-rip-peer-config:
+
+RIP BFD configuration
+---------------------
+
+The following commands are available inside the interface configuration node:
+
+.. clicmd:: ip rip bfd
+
+   Automatically create BFD session for each RIP peer discovered in this
+   interface. When the BFD session monitor signalize that the link is down
+   the RIP peer is removed and all the learned routes associated with that
+   peer are removed.
+
+
+.. clicmd:: ip rip bfd profile BFD_PROFILE_NAME
+
+   Selects a BFD profile for the BFD sessions created in this interface.
+
+
+The following command is available in the RIP router configuration node:
+
+.. clicmd:: bfd default-profile BFD_PROFILE_NAME
+
+   Selects a default BFD profile for all sessions without a profile specified.
+
+
+.. _bfd-static-peer-config:
+
+BFD Static Route Monitoring Configuration
+-----------------------------------------
+
+A monitored static route conditions the installation to the RIB on the
+BFD session running state: when BFD session is up the route is installed
+to RIB, but when the BFD session is down it is removed from the RIB.
+
+The following commands are available inside the configuration node:
+
+.. clicmd:: ip route A.B.C.D/M A.B.C.D bfd [{multi-hop|source A.B.C.D|profile BFDPROF}]
+
+   Configure a static route for ``A.B.C.D/M`` using gateway ``A.B.C.D`` and use
+   the gateway address as BFD peer destination address.
+
+.. clicmd:: ipv6 route X:X::X:X/M [from X:X::X:X/M] X:X::X:X bfd [{multi-hop|source X:X::X:X|profile BFDPROF}]
+
+   Configure a static route for ``X:X::X:X/M`` using gateway
+   ``X:X::X:X`` and use the gateway address as BFD peer destination
+   address.
+
+The static routes when uninstalled will no longer show up in the output of
+the command ``show ip route`` or ``show ipv6 route``, instead we must use the
+BFD static route show command to see these monitored route status.
+
+.. clicmd:: show bfd static route [json]
+
+   Show all monitored static routes and their status.
+
+   Example output:
+
+   ::
+
+      Showing BFD monitored static routes:
+
+        Route groups:
+          rtg1 peer 172.16.0.1 (status: uninstalled):
+              2001:db8::100/128
+
+      Next hops:
+        VRF default IPv4 Unicast:
+            192.168.100.0/24 peer 172.16.0.1 (status: uninstalled)
+
+        VRF default IPv4 Multicast:
+
+        VRF default IPv6 Unicast:
 
 .. _bfd-configuration:
 

@@ -27,10 +27,12 @@ Basics
    grpc
    filter
    routemap
+   affinitymap
    ipv6
    kernel
    snmp
    scripting
+   nexthop_groups
 .. modules
 
 #########
@@ -48,6 +50,7 @@ Protocols
    fabricd
    ldpd
    eigrpd
+   evpn
    isisd
    nhrpd
    ospfd
@@ -64,6 +67,7 @@ Protocols
    vrrp
    bmp
    watchfrr
+   mgmtd
 
 ########
 Appendix

@@ -1,21 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * BGPd - Mac hash code
  * Copyright (C) 2018 Cumulus Networks, Inc.
  *               Donald Sharp
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include <zebra.h>
 
@@ -77,8 +64,7 @@ static void bgp_mac_hash_free(void *data)
 
 void bgp_mac_finish(void)
 {
-	hash_clean(bm->self_mac_hash, bgp_mac_hash_free);
-	hash_free(bm->self_mac_hash);
+	hash_clean_and_free(&bm->self_mac_hash, bgp_mac_hash_free);
 }
 
 static void bgp_mac_hash_interface_string_del(void *val)
@@ -211,16 +197,10 @@ static void bgp_process_mac_rescan_table(struct bgp *bgp, struct peer *peer,
 
 			memcpy(&evpn, bgp_attr_get_evpn_overlay(pi->attr),
 			       sizeof(evpn));
-			int32_t ret = bgp_update(peer, p,
-						 pi->addpath_rx_id,
-						 pi->attr, AFI_L2VPN, SAFI_EVPN,
-						 ZEBRA_ROUTE_BGP,
-						 BGP_ROUTE_NORMAL, &prd,
-						 label_pnt, num_labels,
-						 1, evpn);
-
-			if (ret < 0)
-				bgp_dest_unlock_node(dest);
+			bgp_update(peer, p, pi->addpath_rx_id, pi->attr,
+				   AFI_L2VPN, SAFI_EVPN, ZEBRA_ROUTE_BGP,
+				   BGP_ROUTE_NORMAL, &prd, label_pnt,
+				   num_labels, 1, evpn);
 		}
 	}
 }
@@ -242,19 +222,18 @@ static void bgp_mac_rescan_evpn_table(struct bgp *bgp, struct ethaddr *macaddr)
 		if (!peer_established(peer))
 			continue;
 
-		if (CHECK_FLAG(peer->af_flags[afi][safi],
-			       PEER_FLAG_SOFT_RECONFIG)) {
-			if (bgp_debug_update(peer, NULL, NULL, 1))
-				zlog_debug("Processing EVPN MAC interface change on peer %s (inbound, soft-reconfig)",
-					   peer->host);
+		if (bgp_debug_update(peer, NULL, NULL, 1))
+			zlog_debug(
+				"Processing EVPN MAC interface change on peer %s %s",
+				peer->host,
+				CHECK_FLAG(peer->af_flags[afi][safi],
+					   PEER_FLAG_SOFT_RECONFIG)
+					? "(inbound, soft-reconfig)"
+					: "");
 
-			bgp_soft_reconfig_in(peer, afi, safi);
-		} else {
+		if (!bgp_soft_reconfig_in(peer, afi, safi)) {
 			struct bgp_table *table = bgp->rib[afi][safi];
 
-			if (bgp_debug_update(peer, NULL, NULL, 1))
-				zlog_debug("Processing EVPN MAC interface change on peer %s",
-					   peer->host);
 			bgp_process_mac_rescan_table(bgp, peer, table, macaddr);
 		}
 	}
@@ -381,7 +360,7 @@ bool bgp_mac_exist(const struct ethaddr *mac)
 	return true;
 }
 
-/* This API checks EVPN type-2 prefix and comapares
+/* This API checks EVPN type-2 prefix and compares
  * mac against any of local assigned (SVIs) MAC
  * address.
  */
@@ -396,8 +375,6 @@ bool bgp_mac_entry_exists(const struct prefix *p)
 		return false;
 
 	return bgp_mac_exist(&p->u.prefix_evpn.macip_addr.mac);
-
-	return true;
 }
 
 static void bgp_mac_show_mac_entry(struct hash_bucket *bucket, void *arg)

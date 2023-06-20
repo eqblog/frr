@@ -1,21 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Copyright (C) 2003 Yasuhiro Ohara
- *
- * This file is part of GNU Zebra.
- *
- * GNU Zebra is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * GNU Zebra is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License along
- * with this program; see the file COPYING; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 #include <zebra.h>
@@ -26,7 +11,7 @@
 #include "linklist.h"
 #include "prefix.h"
 #include "table.h"
-#include "thread.h"
+#include "frrevent.h"
 #include "command.h"
 #include "defaults.h"
 #include "lib/json.h"
@@ -65,9 +50,7 @@ FRR_CFG_DEFAULT_BOOL(OSPF6_LOG_ADJACENCY_CHANGES,
 	{ .val_bool = false },
 );
 
-#ifndef VTYSH_EXTRACT_PL
 #include "ospf6d/ospf6_top_clippy.c"
-#endif
 
 /* global ospf6d variable */
 static struct ospf6_master ospf6_master;
@@ -193,7 +176,7 @@ static int ospf6_vrf_disable(struct vrf *vrf)
 		 * from VRF and make it "down".
 		 */
 		ospf6_vrf_unlink(ospf6, vrf);
-		thread_cancel(&ospf6->t_ospf6_receive);
+		event_cancel(&ospf6->t_ospf6_receive);
 		close(ospf6->fd);
 		ospf6->fd = -1;
 	}
@@ -224,8 +207,8 @@ static int ospf6_vrf_enable(struct vrf *vrf)
 			ret = ospf6_serv_sock(ospf6);
 			if (ret < 0 || ospf6->fd <= 0)
 				return 0;
-			thread_add_read(master, ospf6_receive, ospf6, ospf6->fd,
-					&ospf6->t_ospf6_receive);
+			event_add_read(master, ospf6_receive, ospf6, ospf6->fd,
+				       &ospf6->t_ospf6_receive);
 
 			ospf6_router_id_update(ospf6, true);
 		}
@@ -472,6 +455,13 @@ struct ospf6 *ospf6_instance_create(const char *name)
 	if (ospf6->router_id == 0)
 		ospf6_router_id_update(ospf6, true);
 	ospf6_add(ospf6);
+
+	/*
+	 * Read from non-volatile memory whether this instance is performing a
+	 * graceful restart or not.
+	 */
+	ospf6_gr_nvm_read(ospf6);
+
 	if (ospf6->vrf_id != VRF_UNKNOWN) {
 		vrf = vrf_lookup_by_id(ospf6->vrf_id);
 		FOR_ALL_INTERFACES (vrf, ifp) {
@@ -482,14 +472,8 @@ struct ospf6 *ospf6_instance_create(const char *name)
 	if (ospf6->fd < 0)
 		return ospf6;
 
-	/*
-	 * Read from non-volatile memory whether this instance is performing a
-	 * graceful restart or not.
-	 */
-	ospf6_gr_nvm_read(ospf6);
-
-	thread_add_read(master, ospf6_receive, ospf6, ospf6->fd,
-			&ospf6->t_ospf6_receive);
+	event_add_read(master, ospf6_receive, ospf6, ospf6->fd,
+		       &ospf6->t_ospf6_receive);
 
 	return ospf6;
 }
@@ -500,12 +484,14 @@ void ospf6_delete(struct ospf6 *o)
 	struct route_node *rn = NULL;
 	struct ospf6_area *oa;
 	struct vrf *vrf;
+	struct ospf6_external_aggr_rt *aggr;
 
 	QOBJ_UNREG(o);
 
 	ospf6_gr_helper_deinit(o);
 	if (!o->gr_info.prepare_in_progress)
 		ospf6_flush_self_originated_lsas_now(o);
+	XFREE(MTYPE_TMP, o->gr_info.exit_reason);
 	ospf6_disable(o);
 	ospf6_del(o);
 
@@ -538,8 +524,11 @@ void ospf6_delete(struct ospf6 *o)
 	}
 
 	for (rn = route_top(o->rt_aggr_tbl); rn; rn = route_next(rn))
-		if (rn->info)
-			ospf6_external_aggregator_free(rn->info);
+		if (rn->info) {
+			aggr = rn->info;
+			ospf6_asbr_summary_config_delete(o, rn);
+			ospf6_external_aggregator_free(aggr);
+		}
 	route_table_finish(o->rt_aggr_tbl);
 
 	XFREE(MTYPE_OSPF6_TOP, o->name);
@@ -565,19 +554,19 @@ static void ospf6_disable(struct ospf6 *o)
 		ospf6_route_remove_all(o->route_table);
 		ospf6_route_remove_all(o->brouter_table);
 
-		THREAD_OFF(o->maxage_remover);
-		THREAD_OFF(o->t_spf_calc);
-		THREAD_OFF(o->t_ase_calc);
-		THREAD_OFF(o->t_distribute_update);
-		THREAD_OFF(o->t_ospf6_receive);
-		THREAD_OFF(o->t_external_aggr);
-		THREAD_OFF(o->gr_info.t_grace_period);
-		THREAD_OFF(o->t_write);
-		THREAD_OFF(o->t_abr_task);
+		EVENT_OFF(o->maxage_remover);
+		EVENT_OFF(o->t_spf_calc);
+		EVENT_OFF(o->t_ase_calc);
+		EVENT_OFF(o->t_distribute_update);
+		EVENT_OFF(o->t_ospf6_receive);
+		EVENT_OFF(o->t_external_aggr);
+		EVENT_OFF(o->gr_info.t_grace_period);
+		EVENT_OFF(o->t_write);
+		EVENT_OFF(o->t_abr_task);
 	}
 }
 
-void ospf6_master_init(struct thread_master *master)
+void ospf6_master_init(struct event_loop *master)
 {
 	memset(&ospf6_master, 0, sizeof(ospf6_master));
 
@@ -586,9 +575,9 @@ void ospf6_master_init(struct thread_master *master)
 	om6->master = master;
 }
 
-static void ospf6_maxage_remover(struct thread *thread)
+static void ospf6_maxage_remover(struct event *thread)
 {
-	struct ospf6 *o = (struct ospf6 *)THREAD_ARG(thread);
+	struct ospf6 *o = (struct ospf6 *)EVENT_ARG(thread);
 	struct ospf6_area *oa;
 	struct ospf6_interface *oi;
 	struct ospf6_neighbor *on;
@@ -632,9 +621,9 @@ static void ospf6_maxage_remover(struct thread *thread)
 void ospf6_maxage_remove(struct ospf6 *o)
 {
 	if (o)
-		thread_add_timer(master, ospf6_maxage_remover, o,
-				 OSPF_LSA_MAXAGE_REMOVE_DELAY_DEFAULT,
-				 &o->maxage_remover);
+		event_add_timer(master, ospf6_maxage_remover, o,
+				OSPF_LSA_MAXAGE_REMOVE_DELAY_DEFAULT,
+				&o->maxage_remover);
 }
 
 bool ospf6_router_id_update(struct ospf6 *ospf6, bool init)
@@ -706,6 +695,9 @@ DEFUN(no_router_ospf6, no_router_ospf6_cmd, "no router ospf6 [vrf NAME]",
 	if (ospf6 == NULL)
 		vty_out(vty, "OSPFv3 is not configured\n");
 	else {
+		if (ospf6->gr_info.restart_support)
+			ospf6_gr_nvm_delete(ospf6);
+
 		ospf6_delete(ospf6);
 		ospf6 = NULL;
 	}
@@ -1372,7 +1364,7 @@ static void ospf6_show(struct vty *vty, struct ospf6 *o, json_object *json,
 		} else
 			json_object_boolean_false_add(json, "spfHasRun");
 
-		if (thread_is_scheduled(o->t_spf_calc)) {
+		if (event_is_scheduled(o->t_spf_calc)) {
 			long time_store;
 
 			json_object_boolean_true_add(json, "spfTimerActive");
@@ -1465,8 +1457,7 @@ static void ospf6_show(struct vty *vty, struct ospf6 *o, json_object *json,
 
 		threadtimer_string(now, o->t_spf_calc, buf, sizeof(buf));
 		vty_out(vty, " SPF timer %s%s\n",
-			(thread_is_scheduled(o->t_spf_calc) ? "due in "
-							    : "is "),
+			(event_is_scheduled(o->t_spf_calc) ? "due in " : "is "),
 			buf);
 
 		if (CHECK_FLAG(o->flag, OSPF6_STUB_ROUTER))
@@ -2013,9 +2004,6 @@ ospf6_show_vrf_name(struct vty *vty, struct ospf6 *ospf6,
 	}
 }
 
-#if CONFDATE > 20230131
-CPP_NOTICE("Remove JSON object commands with keys containing whitespaces")
-#endif
 static int
 ospf6_show_summary_address(struct vty *vty, struct ospf6 *ospf6,
 			json_object *json,
@@ -2035,8 +2023,6 @@ ospf6_show_summary_address(struct vty *vty, struct ospf6 *ospf6,
 
 		ospf6_show_vrf_name(vty, ospf6, json_vrf);
 
-		json_object_int_add(json_vrf, "aggregation delay interval",
-				    ospf6->aggr_delay_interval);
 		json_object_int_add(json_vrf, "aggregationDelayInterval",
 				    ospf6->aggr_delay_interval);
 	}
@@ -2060,17 +2046,9 @@ ospf6_show_summary_address(struct vty *vty, struct ospf6 *ospf6,
 						buf,
 						json_aggr);
 
-			json_object_string_add(json_aggr,
-					"Summary address",
-					buf);
 			json_object_string_add(json_aggr, "summaryAddress",
 					       buf);
 
-			json_object_string_add(
-				json_aggr, "Metric-type",
-				(aggr->mtype == DEFAULT_METRIC_TYPE)
-					? "E2"
-					: "E1");
 			json_object_string_add(
 				json_aggr, "metricType",
 				(aggr->mtype == DEFAULT_METRIC_TYPE) ? "E2"
@@ -2084,9 +2062,6 @@ ospf6_show_summary_address(struct vty *vty, struct ospf6 *ospf6,
 			json_object_int_add(json_aggr, "Tag",
 					    aggr->tag);
 
-			json_object_int_add(json_aggr,
-					"External route count",
-					OSPF6_EXTERNAL_RT_COUNT(aggr));
 			json_object_int_add(json_aggr, "externalRouteCount",
 					    OSPF6_EXTERNAL_RT_COUNT(aggr));
 
